@@ -1,5 +1,15 @@
-import { useState } from 'react';
-import { createApplicant, deleteApplicant, getApplicants, loginUser, registerUser, updateApplicant } from './api.js';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  createApplicant,
+  deleteApplicant,
+  getApplicants,
+  getCurrentUser,
+  loginUser,
+  registerUser,
+  updateApplicant,
+} from './api.js';
+
+const inactivityTimeoutMs = 5 * 60 * 1000;
 
 const countryCodes = [
   { code: '+63', label: '+63 Philippines' },
@@ -252,6 +262,85 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('create');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingApplicant, setIsSavingApplicant] = useState(false);
+  const [isRestoringSession, setIsRestoringSession] = useState(() => Boolean(localStorage.getItem('authToken')));
+  const inactivityTimerRef = useRef(null);
+
+  const handleLogout = useCallback(({ dueToInactivity = false } = {}) => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+
+    localStorage.removeItem('authToken');
+    setUser(null);
+    setToken('');
+    setApplicants([]);
+    setApplicantSearch('');
+    setLastSavedApplicantId('');
+    setEditingApplicantId('');
+    setActiveTab('create');
+    setApplicantForm(emptyApplicant);
+    setUsername('');
+    setPassword('');
+    setError('');
+    setMessage(dueToInactivity ? 'You were logged out after 5 minutes of inactivity.' : '');
+  }, []);
+
+  useEffect(() => {
+    const savedToken = localStorage.getItem('authToken');
+    if (!savedToken) {
+      setIsRestoringSession(false);
+      return;
+    }
+
+    async function restoreSession() {
+      try {
+        const userData = await getCurrentUser(savedToken);
+        const applicantData = await getApplicants(savedToken);
+        setToken(savedToken);
+        setUser(userData.user);
+        setApplicants(applicantData.applicants);
+      } catch {
+        localStorage.removeItem('authToken');
+      } finally {
+        setIsRestoringSession(false);
+      }
+    }
+
+    restoreSession();
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      return undefined;
+    }
+
+    const resetInactivityTimer = () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+
+      inactivityTimerRef.current = setTimeout(() => {
+        handleLogout({ dueToInactivity: true });
+      }, inactivityTimeoutMs);
+    };
+
+    const activityEvents = ['mousedown', 'keydown', 'touchstart', 'scroll'];
+    resetInactivityTimer();
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, resetInactivityTimer, { passive: true });
+    });
+
+    return () => {
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+        inactivityTimerRef.current = null;
+      }
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, resetInactivityTimer);
+      });
+    };
+  }, [user, handleLogout]);
 
   const isLogin = mode === 'login';
   const isEditingApplicant = Boolean(editingApplicantId);
@@ -445,20 +534,14 @@ export default function App() {
     updateApplicantField('photo', '');
   }
 
-  function handleLogout() {
-    localStorage.removeItem('authToken');
-    setUser(null);
-    setToken('');
-    setApplicants([]);
-    setApplicantSearch('');
-    setLastSavedApplicantId('');
-    setEditingApplicantId('');
-    setActiveTab('create');
-    setApplicantForm(emptyApplicant);
-    setUsername('');
-    setPassword('');
-    setMessage('');
-    setError('');
+  if (isRestoringSession) {
+    return (
+      <main className="page-shell">
+        <section className="auth-card">
+          <p className="subtitle">Restoring your session...</p>
+        </section>
+      </main>
+    );
   }
 
   if (user) {

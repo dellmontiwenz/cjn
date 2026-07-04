@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import App from './App.jsx';
@@ -15,6 +15,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   vi.restoreAllMocks();
 });
@@ -63,6 +64,74 @@ test('logs in and shows the authenticated user', async () => {
     expect(screen.getByText('You are logged in as wendell.')).toBeInTheDocument();
   });
   expect(localStorage.getItem('authToken')).toBe('abc123');
+});
+
+test('restores login from saved token when the page reloads', async () => {
+  localStorage.setItem('authToken', 'abc123');
+
+  fetch
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        user: { id: '1', username: 'wendell' },
+      }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ applicants: [] }),
+    });
+
+  render(<App />);
+
+  await waitFor(() => {
+    expect(screen.getByText('You are logged in as wendell.')).toBeInTheDocument();
+  });
+  expect(fetch).toHaveBeenCalledWith(
+    'http://localhost:5001/api/auth/me',
+    expect.objectContaining({
+      headers: expect.objectContaining({
+        Authorization: 'Bearer abc123',
+      }),
+    }),
+  );
+});
+
+test('logs out after 5 minutes of inactivity', async () => {
+  vi.useFakeTimers();
+
+  fetch
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        token: 'abc123',
+        user: { id: '1', username: 'wendell' },
+      }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ applicants: [] }),
+    });
+
+  render(<App />);
+
+  fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'wendell' } });
+  fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /log in/i }));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(screen.getByText('You are logged in as wendell.')).toBeInTheDocument();
+
+  await act(async () => {
+    vi.advanceTimersByTime(5 * 60 * 1000);
+  });
+
+  expect(screen.getByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
+  expect(screen.getByText('You were logged out after 5 minutes of inactivity.')).toBeInTheDocument();
+  expect(localStorage.getItem('authToken')).toBeNull();
 });
 
 test('loads saved applicants after login but hides them until searched', async () => {
