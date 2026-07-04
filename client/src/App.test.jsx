@@ -493,6 +493,145 @@ test('uploads a photo and shows it on the saved applicant', async () => {
   expect(body.photo).toBe(photoDataUrl);
 });
 
+test('removes a saved applicant photo from the search card', async () => {
+  const photoDataUrl = 'data:image/png;base64,aGVsbG8=';
+
+  fetch
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        token: 'abc123',
+        user: { id: '1', username: 'wendell' },
+      }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        applicants: [
+          {
+            id: 'applicant-1',
+            firstName: 'Maria',
+            lastName: 'Reyes',
+            dateOfBirth: '1997-05-20',
+            sex: 'Female',
+            phoneNumber: '9171234567',
+            emailAddress: 'maria@example.com',
+            passportNumber: 'P1234567',
+            education: 'Bachelor of Science in Nursing',
+            photo: photoDataUrl,
+          },
+        ],
+      }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        applicant: {
+          id: 'applicant-1',
+          firstName: 'Maria',
+          lastName: 'Reyes',
+          dateOfBirth: '1997-05-20',
+          sex: 'Female',
+          phoneNumber: '9171234567',
+          emailAddress: 'maria@example.com',
+          passportNumber: 'P1234567',
+          education: 'Bachelor of Science in Nursing',
+          photo: '',
+        },
+      }),
+    });
+
+  const user = userEvent.setup();
+  render(<App />);
+
+  await user.type(screen.getByLabelText(/username/i), 'wendell');
+  await user.type(screen.getByLabelText(/password/i), 'password123');
+  await user.click(screen.getByRole('button', { name: /log in/i }));
+  await user.click(await screen.findByRole('button', { name: /search applicants/i }));
+
+  expect(screen.getByAltText('Maria Reyes photo').getAttribute('src')).toBe(photoDataUrl);
+  await user.click(screen.getByRole('button', { name: /^remove photo$/i }));
+
+  await waitFor(() => {
+    expect(screen.getByText('Applicant photo removed.')).toBeInTheDocument();
+  });
+  expect(screen.getByAltText('Maria Reyes photo').getAttribute('src')).toContain('data:image/svg+xml');
+
+  const [, updateOptions] = fetch.mock.calls.at(-1);
+  expect(updateOptions.method).toBe('PUT');
+  expect(JSON.parse(updateOptions.body).photo).toBe('');
+});
+
+test('removes a photo while editing and saves the default photo', async () => {
+  const photoDataUrl = 'data:image/png;base64,aGVsbG8=';
+
+  fetch
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        token: 'abc123',
+        user: { id: '1', username: 'wendell' },
+      }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        applicants: [
+          {
+            id: 'applicant-1',
+            firstName: 'Maria',
+            lastName: 'Reyes',
+            dateOfBirth: '1997-05-20',
+            sex: 'Female',
+            phoneNumber: '9171234567',
+            emailAddress: 'maria@example.com',
+            passportNumber: 'P1234567',
+            education: 'Bachelor of Science in Nursing',
+            photo: photoDataUrl,
+          },
+        ],
+      }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        applicant: {
+          id: 'applicant-1',
+          firstName: 'Maria',
+          lastName: 'Reyes',
+          dateOfBirth: '1997-05-20',
+          sex: 'Female',
+          phoneNumber: '9171234567',
+          emailAddress: 'maria@example.com',
+          passportNumber: 'P1234567',
+          education: 'Bachelor of Science in Nursing',
+          photo: '',
+        },
+      }),
+    });
+
+  const user = userEvent.setup();
+  render(<App />);
+
+  await user.type(screen.getByLabelText(/username/i), 'wendell');
+  await user.type(screen.getByLabelText(/password/i), 'password123');
+  await user.click(screen.getByRole('button', { name: /log in/i }));
+  await user.click(await screen.findByRole('button', { name: /search applicants/i }));
+  await user.click(screen.getByRole('button', { name: /edit maria reyes/i }));
+
+  expect(screen.getByAltText('Applicant photo preview').getAttribute('src')).toBe(photoDataUrl);
+  await user.click(screen.getByRole('button', { name: /^remove photo$/i }));
+  expect(screen.getByAltText('Applicant photo preview').getAttribute('src')).toContain('data:image/svg+xml');
+  await user.click(screen.getByRole('button', { name: /update applicant/i }));
+
+  await waitFor(() => {
+    expect(screen.getByText('Applicant updated in MongoDB.')).toBeInTheDocument();
+  });
+
+  const [, updateOptions] = fetch.mock.calls.at(-1);
+  expect(JSON.parse(updateOptions.body).photo).toBe('');
+});
+
 test('creates an applicant and shows saved applicant information', async () => {
   fetch
     .mockResolvedValueOnce({

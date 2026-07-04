@@ -346,6 +346,24 @@ button:disabled {
   margin-bottom: 0.5rem;
 }
 
+.applicant-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.applicant-photo-actions .photo-upload-label {
+  font-size: 0.82rem;
+  padding: 0.4rem 0.75rem;
+}
+
+.applicant-photo-actions .secondary-button {
+  font-size: 0.82rem;
+  padding: 0.4rem 0.75rem;
+}
+
 .input-invalid {
   border-color: #dc2626;
 }

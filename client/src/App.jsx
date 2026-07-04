@@ -509,6 +509,23 @@ export default function App() {
     }));
   }
 
+  function readPhotoFile(file) {
+    if (!file.type.startsWith('image/')) {
+      throw new Error('Please choose an image file for the photo.');
+    }
+
+    if (file.size > maxPhotoBytes) {
+      throw new Error('Photo must be 2 MB or smaller.');
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Could not read the selected photo. Please try again.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
   function handlePhotoChange(event) {
     const file = event.target.files && event.target.files[0];
     event.target.value = '';
@@ -517,29 +534,60 @@ export default function App() {
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
-      setError('Please choose an image file for the photo.');
-      return;
-    }
-
-    if (file.size > maxPhotoBytes) {
-      setError('Photo must be 2 MB or smaller.');
-      return;
-    }
-
     setError('');
-    const reader = new FileReader();
-    reader.onload = () => {
-      updateApplicantField('photo', String(reader.result || ''));
-    };
-    reader.onerror = () => {
-      setError('Could not read the selected photo. Please try again.');
-    };
-    reader.readAsDataURL(file);
+    readPhotoFile(file)
+      .then((photo) => updateApplicantField('photo', photo))
+      .catch((photoError) => setError(photoError.message));
   }
 
   function handleRemovePhoto() {
     updateApplicantField('photo', '');
+  }
+
+  async function saveApplicantPhoto(applicant, photo) {
+    setError('');
+    setMessage('');
+    setIsSavingApplicant(true);
+
+    try {
+      const data = await updateApplicant(token, applicant.id, {
+        ...applicantToForm(applicant),
+        photo,
+      });
+      setApplicants((currentApplicants) =>
+        currentApplicants.map((currentApplicant) =>
+          currentApplicant.id === applicant.id ? data.applicant : currentApplicant,
+        ),
+      );
+      if (editingApplicantId === applicant.id) {
+        updateApplicantField('photo', photo);
+      }
+      setMessage(photo ? 'Applicant photo updated.' : 'Applicant photo removed.');
+    } catch (photoError) {
+      setError(photoError.message);
+    } finally {
+      setIsSavingApplicant(false);
+    }
+  }
+
+  async function handleCardPhotoChange(applicant, event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const photo = await readPhotoFile(file);
+      await saveApplicantPhoto(applicant, photo);
+    } catch (photoError) {
+      setError(photoError.message);
+    }
+  }
+
+  async function handleCardPhotoRemove(applicant) {
+    await saveApplicantPhoto(applicant, '');
   }
 
   if (isRestoringSession) {
@@ -646,7 +694,10 @@ export default function App() {
                       Remove photo
                     </button>
                   )}
-                  <p className="optional-hint">JPG or PNG, up to 2 MB. A default photo is used if none is uploaded.</p>
+                  <p className="optional-hint">
+                    JPG or PNG, up to 2 MB. Use Change photo to replace it, or Remove photo to use the default.
+                    {isEditingApplicant ? ' Click Update applicant to save photo changes from this form.' : ''}
+                  </p>
                 </div>
               </div>
 
@@ -973,6 +1024,29 @@ export default function App() {
                         src={applicant.photo || defaultApplicantPhoto}
                         alt={`${[applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ')} photo`}
                       />
+                      <div className="applicant-photo-actions">
+                        <label htmlFor={`photo-${applicant.id}`} className="photo-upload-label">
+                          {applicant.photo ? 'Change photo' : 'Upload photo'}
+                        </label>
+                        <input
+                          id={`photo-${applicant.id}`}
+                          type="file"
+                          accept="image/*"
+                          className="photo-input"
+                          disabled={isSavingApplicant}
+                          onChange={(event) => handleCardPhotoChange(applicant, event)}
+                        />
+                        {applicant.photo && (
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            disabled={isSavingApplicant}
+                            onClick={() => handleCardPhotoRemove(applicant)}
+                          >
+                            Remove photo
+                          </button>
+                        )}
+                      </div>
                       <h3>
                         {[applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ')}
                       </h3>
