@@ -34,6 +34,22 @@ export function createApp({ userModel, applicantModel } = {}) {
 
   app.use((error, req, res, next) => {
     console.error(error);
+
+    if (
+      error.name === 'MongoServerError' ||
+      error.codeName === 'AtlasError' ||
+      String(error.message).includes('bad auth')
+    ) {
+      return res.status(503).json({
+        message:
+          'Database connection failed. The MongoDB password in MONGODB_URI is incorrect or outdated. Update server/.env and Render, then restart the server.',
+      });
+    }
+
+    if (String(error.message).includes('MONGODB_URI')) {
+      return res.status(503).json({ message: error.message });
+    }
+
     res.status(500).json({ message: 'Something went wrong' });
   });
 

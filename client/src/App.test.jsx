@@ -134,7 +134,7 @@ test('logs out after 5 minutes of inactivity', async () => {
   expect(localStorage.getItem('authToken')).toBeNull();
 });
 
-test('loads saved applicants after login but hides them until searched', async () => {
+test('loads saved applicants after login and shows them on the search tab', async () => {
   fetch
     .mockResolvedValueOnce({
       ok: true,
@@ -184,8 +184,7 @@ test('loads saved applicants after login but hides them until searched', async (
 
   await user.click(screen.getByRole('button', { name: /search applicants/i }));
 
-  expect(screen.queryByText('Maria Santos Reyes')).not.toBeInTheDocument();
-  expect(screen.getByText('Search for an applicant to show saved details.')).toBeInTheDocument();
+  expect(screen.getByText('Maria Santos Reyes')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /show\/retrieve applicants/i })).not.toBeInTheDocument();
 });
 

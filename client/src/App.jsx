@@ -350,7 +350,7 @@ export default function App() {
     const fullName = [applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ');
 
     if (!search) {
-      return applicant.id === lastSavedApplicantId;
+      return true;
     }
 
     return [fullName, ...applicantSearchFields.map((field) => applicant[field])]
@@ -952,7 +952,9 @@ export default function App() {
               {message && <p className="form-success">{message}</p>}
               {displayedApplicants.length === 0 ? (
                 <p className="empty-state">
-                  {hasApplicantSearch ? 'No matching applicants found.' : 'Search for an applicant to show saved details.'}
+                  {hasApplicantSearch
+                    ? 'No matching applicants found.'
+                    : 'No applicants saved yet.'}
                 </p>
               ) : (
                 <div className="applicant-cards">

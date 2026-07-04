@@ -1,13 +1,21 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 async function request(path, options = {}) {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-  });
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+    });
+  } catch {
+    throw new Error(
+      `Cannot reach the server at ${API_URL}. If you are running locally, start the backend with "npm run dev:server" and check MONGODB_URI in server/.env.`,
+    );
+  }
 
   const data = await response.json();
 
