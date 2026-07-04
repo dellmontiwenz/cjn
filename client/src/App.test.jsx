@@ -112,6 +112,10 @@ test('loads saved applicants after login but hides them until searched', async (
     );
   });
   expect(screen.queryByText('Maria Santos Reyes')).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: /search applicants/i }));
+
+  expect(screen.queryByText('Maria Santos Reyes')).not.toBeInTheDocument();
   expect(screen.getByText('Search for an applicant to show saved details.')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /show\/retrieve applicants/i })).not.toBeInTheDocument();
 });
@@ -182,7 +186,6 @@ test('dynamically searches applicants and suggests matching names', async () => 
   expect(screen.getAllByText('Maria Santos Reyes')).toHaveLength(2);
   expect(screen.queryByText('Juan Dela Cruz')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /^maria santos reyes$/i })).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /^search applicants$/i })).not.toBeInTheDocument();
 });
 
 test('shows applicant information when a suggested applicant name is clicked', async () => {
@@ -504,6 +507,125 @@ test('saves Hungary appointment yes/no answers and shows them', async () => {
   const body = JSON.parse(createOptions.body);
   expect(body.signatureAuthenticationAppointment).toBe('Yes');
   expect(body.dVisaBookingAppointment).toBe('No');
+});
+
+test('saves notes about applicant requirements and shows them', async () => {
+  fetch
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        token: 'abc123',
+        user: { id: '1', username: 'wendell' },
+      }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ applicants: [] }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        applicant: {
+          id: 'applicant-1',
+          firstName: 'Maria',
+          lastName: 'Reyes',
+          dateOfBirth: '1997-05-20',
+          sex: 'Female',
+          phoneNumber: '9171234567',
+          emailAddress: 'maria@example.com',
+          passportNumber: 'P1234567',
+          education: 'Bachelor of Science in Nursing',
+          notes: 'Passport scan pending. Surname spelled differently on birth certificate.',
+        },
+      }),
+    });
+
+  const user = userEvent.setup();
+  render(<App />);
+
+  await user.type(screen.getByLabelText(/username/i), 'wendell');
+  await user.type(screen.getByLabelText(/password/i), 'password123');
+  await user.click(screen.getByRole('button', { name: /log in/i }));
+
+  await screen.findByRole('heading', { name: /applicant dashboard/i });
+
+  await user.type(screen.getByLabelText(/first name/i), 'Maria');
+  await user.type(screen.getByLabelText(/last name/i), 'Reyes');
+  fireEvent.change(screen.getByLabelText(/date of birth/i), { target: { value: '1997-05-20' } });
+  await user.selectOptions(screen.getByLabelText(/sex/i), 'Female');
+  await user.type(screen.getByLabelText(/phone number/i), '9171234567');
+  await user.type(screen.getByLabelText(/email address/i), 'maria@example.com');
+  await user.type(screen.getByLabelText(/passport number/i), 'P1234567');
+  await user.type(screen.getByLabelText(/^education$/i), 'Bachelor of Science in Nursing');
+  await user.type(
+    screen.getByLabelText(/^notes/i),
+    'Passport scan pending. Surname spelled differently on birth certificate.',
+  );
+  await user.click(screen.getByRole('button', { name: /save applicant/i }));
+
+  await waitFor(() => {
+    expect(screen.getByText('Maria Reyes')).toBeInTheDocument();
+  });
+  expect(
+    screen.getByText(line('Notes: Passport scan pending. Surname spelled differently on birth certificate.')),
+  ).toBeInTheDocument();
+
+  const [, createOptions] = fetch.mock.calls.at(-1);
+  const body = JSON.parse(createOptions.body);
+  expect(body.notes).toBe('Passport scan pending. Surname spelled differently on birth certificate.');
+});
+
+test('blocks saving a duplicate full name and email and prompts the user', async () => {
+  fetch
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        token: 'abc123',
+        user: { id: '1', username: 'wendell' },
+      }),
+    })
+    .mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        applicants: [
+          {
+            id: 'applicant-1',
+            firstName: 'Maria',
+            middleName: 'Santos',
+            lastName: 'Reyes',
+            dateOfBirth: '1997-05-20',
+            sex: 'Female',
+            phoneNumber: '9171234567',
+            emailAddress: 'maria@example.com',
+            passportNumber: 'P1234567',
+            education: 'Bachelor of Science in Nursing',
+          },
+        ],
+      }),
+    });
+
+  const user = userEvent.setup();
+  render(<App />);
+
+  await user.type(screen.getByLabelText(/username/i), 'wendell');
+  await user.type(screen.getByLabelText(/password/i), 'password123');
+  await user.click(screen.getByRole('button', { name: /log in/i }));
+
+  await screen.findByRole('heading', { name: /create new applicant/i });
+
+  await user.type(screen.getByLabelText(/first name/i), 'Maria');
+  await user.type(screen.getByLabelText(/middle name/i), 'Santos');
+  await user.type(screen.getByLabelText(/last name/i), 'Reyes');
+  fireEvent.change(screen.getByLabelText(/date of birth/i), { target: { value: '1997-05-20' } });
+  await user.selectOptions(screen.getByLabelText(/sex/i), 'Female');
+  await user.type(screen.getByLabelText(/phone number/i), '9171234567');
+  await user.type(screen.getByLabelText(/email address/i), 'maria@example.com');
+  await user.type(screen.getByLabelText(/passport number/i), 'P7654321');
+  await user.type(screen.getByLabelText(/^education$/i), 'Bachelor of Science in Nursing');
+  await user.click(screen.getByRole('button', { name: /save applicant/i }));
+
+  expect(screen.getByText('An applicant with the same full name and email already exists.')).toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledTimes(2);
 });
 
 test('edits a searched applicant and appends new information', async () => {

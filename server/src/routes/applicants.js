@@ -13,6 +13,38 @@ const requiredFields = [
   'education',
 ];
 
+const duplicateMessage = 'An applicant with the same full name and email already exists';
+
+function applicantFullName(applicant) {
+  return [applicant.firstName, applicant.middleName, applicant.lastName]
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function isDuplicateApplicant(existingApplicants, applicantData, excludeId) {
+  const targetName = applicantFullName(applicantData);
+  const targetEmail = normalizeEmail(applicantData.emailAddress);
+
+  return existingApplicants.some((applicant) => {
+    if (excludeId && applicant._id.toString() === excludeId) {
+      return false;
+    }
+
+    if (applicant.createdBy !== applicantData.createdBy) {
+      return false;
+    }
+
+    return applicantFullName(applicant) === targetName && normalizeEmail(applicant.emailAddress) === targetEmail;
+  });
+}
+
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function isValidEmail(email) {
@@ -67,6 +99,7 @@ function cleanApplicant(body, userId) {
     clothesSize: String(body.clothesSize || '').trim(),
     signatureAuthenticationAppointment: String(body.signatureAuthenticationAppointment || '').trim(),
     dVisaBookingAppointment: String(body.dVisaBookingAppointment || '').trim(),
+    notes: String(body.notes || '').trim(),
     createdBy: userId,
   };
 }
@@ -98,6 +131,7 @@ function serializeApplicant(applicant) {
     clothesSize: applicant.clothesSize || '',
     signatureAuthenticationAppointment: applicant.signatureAuthenticationAppointment || '',
     dVisaBookingAppointment: applicant.dVisaBookingAppointment || '',
+    notes: applicant.notes || '',
     createdBy: applicant.createdBy,
   };
 }
@@ -114,6 +148,11 @@ export function createApplicantsRouter(applicantModel = Applicant) {
 
       if (validationError) {
         return res.status(400).json({ message: validationError });
+      }
+
+      const existingApplicants = await applicantModel.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
+      if (isDuplicateApplicant(existingApplicants, applicantData)) {
+        return res.status(409).json({ message: duplicateMessage });
       }
 
       const applicant = await applicantModel.create(applicantData);
@@ -141,6 +180,11 @@ export function createApplicantsRouter(applicantModel = Applicant) {
 
       if (validationError) {
         return res.status(400).json({ message: validationError });
+      }
+
+      const existingApplicants = await applicantModel.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
+      if (isDuplicateApplicant(existingApplicants, applicantData, req.params.id)) {
+        return res.status(409).json({ message: duplicateMessage });
       }
 
       const updatedApplicant = await applicantModel.findOneAndUpdate(

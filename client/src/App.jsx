@@ -59,6 +59,7 @@ const emptyApplicant = {
   clothesSize: '',
   signatureAuthenticationAppointment: '',
   dVisaBookingAppointment: '',
+  notes: '',
 };
 
 const applicantSearchFields = [
@@ -86,7 +87,19 @@ const applicantSearchFields = [
   'clothesSize',
   'signatureAuthenticationAppointment',
   'dVisaBookingAppointment',
+  'notes',
 ];
+
+const duplicateApplicantMessage = 'An applicant with the same full name and email already exists.';
+
+function applicantFullName(applicant) {
+  return [applicant.firstName, applicant.middleName, applicant.lastName]
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -176,6 +189,7 @@ const applicantDisplayFields = [
   { label: 'Clothes size', key: 'clothesSize' },
   { label: 'Authentication of Signature appointment', key: 'signatureAuthenticationAppointment' },
   { label: 'D-Visa booking appointment', key: 'dVisaBookingAppointment' },
+  { label: 'Notes', key: 'notes' },
 ];
 
 function applicantToForm(applicant) {
@@ -204,6 +218,7 @@ function applicantToForm(applicant) {
     clothesSize: applicant.clothesSize || '',
     signatureAuthenticationAppointment: applicant.signatureAuthenticationAppointment || '',
     dVisaBookingAppointment: applicant.dVisaBookingAppointment || '',
+    notes: applicant.notes || '',
   };
 }
 
@@ -220,6 +235,7 @@ export default function App() {
   const [applicantSearch, setApplicantSearch] = useState('');
   const [lastSavedApplicantId, setLastSavedApplicantId] = useState('');
   const [editingApplicantId, setEditingApplicantId] = useState('');
+  const [activeTab, setActiveTab] = useState('create');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingApplicant, setIsSavingApplicant] = useState(false);
 
@@ -295,6 +311,21 @@ export default function App() {
       return;
     }
 
+    const targetName = applicantFullName(applicantForm);
+    const targetEmail = applicantForm.emailAddress.trim().toLowerCase();
+    const hasDuplicate = applicants.some((applicant) => {
+      if (isEditingApplicant && applicant.id === editingApplicantId) {
+        return false;
+      }
+
+      return applicantFullName(applicant) === targetName && (applicant.emailAddress || '').trim().toLowerCase() === targetEmail;
+    });
+
+    if (hasDuplicate) {
+      setError(duplicateApplicantMessage);
+      return;
+    }
+
     setIsSavingApplicant(true);
 
     try {
@@ -308,12 +339,14 @@ export default function App() {
         setLastSavedApplicantId(data.applicant.id);
         setEditingApplicantId('');
         setApplicantForm(emptyApplicant);
+        setActiveTab('search');
         setMessage('Applicant updated in MongoDB.');
       } else {
         const data = await createApplicant(token, applicantForm);
         setApplicants((currentApplicants) => [data.applicant, ...currentApplicants]);
         setLastSavedApplicantId(data.applicant.id);
         setApplicantForm(emptyApplicant);
+        setActiveTab('search');
         setMessage('Applicant saved to MongoDB.');
       }
     } catch (submitError) {
@@ -348,6 +381,7 @@ export default function App() {
     setMessage('');
     setEditingApplicantId(applicant.id);
     setApplicantForm(applicantToForm(applicant));
+    setActiveTab('create');
   }
 
   function handleCancelEdit() {
@@ -372,6 +406,7 @@ export default function App() {
     setApplicantSearch('');
     setLastSavedApplicantId('');
     setEditingApplicantId('');
+    setActiveTab('create');
     setApplicantForm(emptyApplicant);
     setUsername('');
     setPassword('');
@@ -394,227 +429,348 @@ export default function App() {
             </button>
           </div>
 
-          <div className="dashboard-grid">
+          <div className="dashboard-tabs" role="tablist">
+            <button
+              type="button"
+              className={activeTab === 'create' ? 'tab-button active' : 'tab-button'}
+              onClick={() => setActiveTab('create')}
+            >
+              {isEditingApplicant ? 'Edit Applicant' : 'Create New Applicant'}
+            </button>
+            <button
+              type="button"
+              className={activeTab === 'search' ? 'tab-button active' : 'tab-button'}
+              onClick={() => setActiveTab('search')}
+            >
+              Search Applicants
+            </button>
+          </div>
+
+          <div className="applicant-search dashboard-search">
+            <label htmlFor="applicantSearch">Search applicant</label>
+            <div className="applicant-search-row">
+              <input
+                id="applicantSearch"
+                value={applicantSearch}
+                onChange={(event) => {
+                  setApplicantSearch(event.target.value);
+                  if (event.target.value.trim()) {
+                    setActiveTab('search');
+                  }
+                }}
+                placeholder="Search name, passport, email, phone, location"
+              />
+            </div>
+            {applicantNameSuggestions.length > 0 && (
+              <div className="applicant-suggestions" aria-label="Applicant name suggestions">
+                {applicantNameSuggestions.map((suggestion) => (
+                  <button
+                    type="button"
+                    className="suggestion-button"
+                    key={suggestion}
+                    onClick={() => {
+                      setApplicantSearch(suggestion);
+                      setActiveTab('search');
+                    }}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="dashboard-content">
+            {activeTab === 'create' && (
             <form className="applicant-form" onSubmit={handleApplicantSubmit}>
               <h2>{isEditingApplicant ? 'Edit Applicant' : 'Create New Applicant'}</h2>
 
               <p className="form-section-label">Personal Information</p>
+              <div className="form-grid">
 
-              <label htmlFor="firstName">First name</label>
-              <input
-                id="firstName"
-                value={applicantForm.firstName}
-                onChange={(event) => updateApplicantField('firstName', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="firstName">First name</label>
+                  <input
+                    id="firstName"
+                    value={applicantForm.firstName}
+                    onChange={(event) => updateApplicantField('firstName', event.target.value)}
+                  />
+                </div>
 
-              <label htmlFor="middleName">
-                Middle name <span className="optional-hint">(optional)</span>
-              </label>
-              <input
-                id="middleName"
-                value={applicantForm.middleName}
-                onChange={(event) => updateApplicantField('middleName', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="middleName">
+                    Middle name <span className="optional-hint">(optional)</span>
+                  </label>
+                  <input
+                    id="middleName"
+                    value={applicantForm.middleName}
+                    onChange={(event) => updateApplicantField('middleName', event.target.value)}
+                  />
+                </div>
 
-              <label htmlFor="lastName">Last name</label>
-              <input
-                id="lastName"
-                value={applicantForm.lastName}
-                onChange={(event) => updateApplicantField('lastName', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="lastName">Last name</label>
+                  <input
+                    id="lastName"
+                    value={applicantForm.lastName}
+                    onChange={(event) => updateApplicantField('lastName', event.target.value)}
+                  />
+                </div>
 
-              <label htmlFor="maidenName">Maiden name</label>
-              <input
-                id="maidenName"
-                value={applicantForm.maidenName}
-                onChange={(event) => updateApplicantField('maidenName', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="maidenName">Maiden name</label>
+                  <input
+                    id="maidenName"
+                    value={applicantForm.maidenName}
+                    onChange={(event) => updateApplicantField('maidenName', event.target.value)}
+                  />
+                </div>
 
-              <label htmlFor="dateOfBirth">Date of birth</label>
-              <input
-                id="dateOfBirth"
-                type="date"
-                value={applicantForm.dateOfBirth}
-                onChange={(event) => updateApplicantField('dateOfBirth', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="dateOfBirth">Date of birth</label>
+                  <input
+                    id="dateOfBirth"
+                    type="date"
+                    value={applicantForm.dateOfBirth}
+                    onChange={(event) => updateApplicantField('dateOfBirth', event.target.value)}
+                  />
+                </div>
 
-              <label htmlFor="sex">Sex</label>
-              <select
-                id="sex"
-                value={applicantForm.sex}
-                onChange={(event) => updateApplicantField('sex', event.target.value)}
-              >
-                <option value="">Select sex</option>
-                <option value="Female">Female</option>
-                <option value="Male">Male</option>
-              </select>
+                <div className="form-field">
+                  <label htmlFor="sex">Sex</label>
+                  <select
+                    id="sex"
+                    value={applicantForm.sex}
+                    onChange={(event) => updateApplicantField('sex', event.target.value)}
+                  >
+                    <option value="">Select sex</option>
+                    <option value="Female">Female</option>
+                    <option value="Male">Male</option>
+                  </select>
+                </div>
 
-              <label htmlFor="placeOfBirth">Place of birth</label>
-              <input
-                id="placeOfBirth"
-                value={applicantForm.placeOfBirth}
-                onChange={(event) => updateApplicantField('placeOfBirth', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="placeOfBirth">Place of birth</label>
+                  <input
+                    id="placeOfBirth"
+                    value={applicantForm.placeOfBirth}
+                    onChange={(event) => updateApplicantField('placeOfBirth', event.target.value)}
+                  />
+                </div>
 
-              <label htmlFor="citizenship">Citizenship</label>
-              <input
-                id="citizenship"
-                value={applicantForm.citizenship}
-                onChange={(event) => updateApplicantField('citizenship', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="citizenship">Citizenship</label>
+                  <input
+                    id="citizenship"
+                    value={applicantForm.citizenship}
+                    onChange={(event) => updateApplicantField('citizenship', event.target.value)}
+                  />
+                </div>
 
-              <label htmlFor="mothersMaidenName">Mother&apos;s maiden name</label>
-              <input
-                id="mothersMaidenName"
-                value={applicantForm.mothersMaidenName}
-                onChange={(event) => updateApplicantField('mothersMaidenName', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="mothersMaidenName">Mother&apos;s maiden name</label>
+                  <input
+                    id="mothersMaidenName"
+                    value={applicantForm.mothersMaidenName}
+                    onChange={(event) => updateApplicantField('mothersMaidenName', event.target.value)}
+                  />
+                </div>
 
-              <label htmlFor="currentLocation">Current location</label>
-              <input
-                id="currentLocation"
-                value={applicantForm.currentLocation}
-                onChange={(event) => updateApplicantField('currentLocation', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="currentLocation">Current location</label>
+                  <input
+                    id="currentLocation"
+                    value={applicantForm.currentLocation}
+                    onChange={(event) => updateApplicantField('currentLocation', event.target.value)}
+                  />
+                </div>
+              </div>
 
               <p className="form-section-label">Contact Information</p>
+              <div className="form-grid">
+                <div className="form-field form-field-phone">
+                  <label htmlFor="phoneNumber">Phone number</label>
+                  <div className="phone-input-row">
+                    <select
+                      id="phoneCountryCode"
+                      aria-label="Country code"
+                      className="phone-country-code"
+                      value={applicantForm.phoneCountryCode}
+                      onChange={(event) => updateApplicantField('phoneCountryCode', event.target.value)}
+                    >
+                      <option value="">Code</option>
+                      {countryCodes.map((entry) => (
+                        <option key={entry.label} value={entry.code}>
+                          {entry.label}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      id="phoneNumber"
+                      inputMode="tel"
+                      placeholder="Mobile number"
+                      aria-invalid={phoneNumberInvalid}
+                      className={phoneNumberInvalid ? 'input-invalid' : undefined}
+                      value={applicantForm.phoneNumber}
+                      onChange={(event) => updateApplicantField('phoneNumber', event.target.value)}
+                    />
+                  </div>
+                  {phoneNumberInvalid && (
+                    <p className="field-error">Enter 6 to 15 digits (numbers only).</p>
+                  )}
+                </div>
 
-              <label htmlFor="phoneNumber">Phone number</label>
-              <div className="phone-input-row">
-                <select
-                  id="phoneCountryCode"
-                  aria-label="Country code"
-                  className="phone-country-code"
-                  value={applicantForm.phoneCountryCode}
-                  onChange={(event) => updateApplicantField('phoneCountryCode', event.target.value)}
-                >
-                  <option value="">Code</option>
-                  {countryCodes.map((entry) => (
-                    <option key={entry.label} value={entry.code}>
-                      {entry.label}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  id="phoneNumber"
-                  inputMode="tel"
-                  placeholder="Mobile number"
-                  aria-invalid={phoneNumberInvalid}
-                  className={phoneNumberInvalid ? 'input-invalid' : undefined}
-                  value={applicantForm.phoneNumber}
-                  onChange={(event) => updateApplicantField('phoneNumber', event.target.value)}
-                />
+                <div className="form-field">
+                  <label htmlFor="emailAddress">Email address</label>
+                  <input
+                    id="emailAddress"
+                    type="email"
+                    aria-invalid={emailInvalid}
+                    className={emailInvalid ? 'input-invalid' : undefined}
+                    value={applicantForm.emailAddress}
+                    onChange={(event) => updateApplicantField('emailAddress', event.target.value)}
+                  />
+                  {emailInvalid && <p className="field-error">Enter a valid email like name@example.com.</p>}
+                </div>
+
+                <div className="form-field form-field-full">
+                  <label htmlFor="homeCountryAddress">Home country address</label>
+                  <textarea
+                    id="homeCountryAddress"
+                    rows="2"
+                    value={applicantForm.homeCountryAddress}
+                    onChange={(event) => updateApplicantField('homeCountryAddress', event.target.value)}
+                  />
+                </div>
+
+                <div className="form-field">
+                  <label htmlFor="postalCode">Postal code</label>
+                  <input
+                    id="postalCode"
+                    value={applicantForm.postalCode}
+                    onChange={(event) => updateApplicantField('postalCode', event.target.value)}
+                  />
+                </div>
               </div>
-              {phoneNumberInvalid && (
-                <p className="field-error">Enter 6 to 15 digits (numbers only).</p>
-              )}
-
-              <label htmlFor="emailAddress">Email address</label>
-              <input
-                id="emailAddress"
-                type="email"
-                aria-invalid={emailInvalid}
-                className={emailInvalid ? 'input-invalid' : undefined}
-                value={applicantForm.emailAddress}
-                onChange={(event) => updateApplicantField('emailAddress', event.target.value)}
-              />
-              {emailInvalid && <p className="field-error">Enter a valid email like name@example.com.</p>}
-
-              <label htmlFor="homeCountryAddress">Home country address</label>
-              <textarea
-                id="homeCountryAddress"
-                rows="2"
-                value={applicantForm.homeCountryAddress}
-                onChange={(event) => updateApplicantField('homeCountryAddress', event.target.value)}
-              />
-
-              <label htmlFor="postalCode">Postal code</label>
-              <input
-                id="postalCode"
-                value={applicantForm.postalCode}
-                onChange={(event) => updateApplicantField('postalCode', event.target.value)}
-              />
 
               <p className="form-section-label">Passport &amp; Travel</p>
+              <div className="form-grid">
+                <div className="form-field">
+                  <label htmlFor="passportNumber">Passport number</label>
+                  <input
+                    id="passportNumber"
+                    value={applicantForm.passportNumber}
+                    onChange={(event) => updateApplicantField('passportNumber', event.target.value)}
+                  />
+                </div>
 
-              <label htmlFor="passportNumber">Passport number</label>
-              <input
-                id="passportNumber"
-                value={applicantForm.passportNumber}
-                onChange={(event) => updateApplicantField('passportNumber', event.target.value)}
-              />
-
-              <label htmlFor="passportExpiry">Passport expiry</label>
-              <input
-                id="passportExpiry"
-                type="date"
-                value={applicantForm.passportExpiry}
-                onChange={(event) => updateApplicantField('passportExpiry', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="passportExpiry">Passport expiry</label>
+                  <input
+                    id="passportExpiry"
+                    type="date"
+                    value={applicantForm.passportExpiry}
+                    onChange={(event) => updateApplicantField('passportExpiry', event.target.value)}
+                  />
+                </div>
+              </div>
 
               <p className="form-section-label">Education &amp; Skills</p>
+              <div className="form-grid">
+                <div className="form-field form-field-full">
+                  <label htmlFor="education">Education</label>
+                  <textarea
+                    id="education"
+                    rows="3"
+                    value={applicantForm.education}
+                    onChange={(event) => updateApplicantField('education', event.target.value)}
+                  />
+                </div>
 
-              <label htmlFor="education">Education</label>
-              <textarea
-                id="education"
-                rows="3"
-                value={applicantForm.education}
-                onChange={(event) => updateApplicantField('education', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="languageSkills">Language skills</label>
+                  <input
+                    id="languageSkills"
+                    value={applicantForm.languageSkills}
+                    onChange={(event) => updateApplicantField('languageSkills', event.target.value)}
+                  />
+                </div>
 
-              <label htmlFor="languageSkills">Language skills</label>
-              <input
-                id="languageSkills"
-                value={applicantForm.languageSkills}
-                onChange={(event) => updateApplicantField('languageSkills', event.target.value)}
-              />
-
-              <label htmlFor="profession">Profession</label>
-              <input
-                id="profession"
-                value={applicantForm.profession}
-                onChange={(event) => updateApplicantField('profession', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="profession">Profession</label>
+                  <input
+                    id="profession"
+                    value={applicantForm.profession}
+                    onChange={(event) => updateApplicantField('profession', event.target.value)}
+                  />
+                </div>
+              </div>
 
               <p className="form-section-label">Uniform Sizing</p>
+              <div className="form-grid">
+                <div className="form-field">
+                  <label htmlFor="shoeSize">Shoe size</label>
+                  <input
+                    id="shoeSize"
+                    value={applicantForm.shoeSize}
+                    onChange={(event) => updateApplicantField('shoeSize', event.target.value)}
+                  />
+                </div>
 
-              <label htmlFor="shoeSize">Shoe size</label>
-              <input
-                id="shoeSize"
-                value={applicantForm.shoeSize}
-                onChange={(event) => updateApplicantField('shoeSize', event.target.value)}
-              />
-
-              <label htmlFor="clothesSize">Clothes size</label>
-              <input
-                id="clothesSize"
-                value={applicantForm.clothesSize}
-                onChange={(event) => updateApplicantField('clothesSize', event.target.value)}
-              />
+                <div className="form-field">
+                  <label htmlFor="clothesSize">Clothes size</label>
+                  <input
+                    id="clothesSize"
+                    value={applicantForm.clothesSize}
+                    onChange={(event) => updateApplicantField('clothesSize', event.target.value)}
+                  />
+                </div>
+              </div>
 
               <p className="form-section-label">Hungary Appointments</p>
+              <div className="form-grid">
+                <div className="form-field">
+                  <label htmlFor="signatureAuthenticationAppointment">Authentication of Signature appointment?</label>
+                  <select
+                    id="signatureAuthenticationAppointment"
+                    value={applicantForm.signatureAuthenticationAppointment}
+                    onChange={(event) => updateApplicantField('signatureAuthenticationAppointment', event.target.value)}
+                  >
+                    <option value="">Select</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
 
-              <label htmlFor="signatureAuthenticationAppointment">Authentication of Signature appointment?</label>
-              <select
-                id="signatureAuthenticationAppointment"
-                value={applicantForm.signatureAuthenticationAppointment}
-                onChange={(event) => updateApplicantField('signatureAuthenticationAppointment', event.target.value)}
-              >
-                <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-              </select>
+                <div className="form-field">
+                  <label htmlFor="dVisaBookingAppointment">D-Visa booking appointment?</label>
+                  <select
+                    id="dVisaBookingAppointment"
+                    value={applicantForm.dVisaBookingAppointment}
+                    onChange={(event) => updateApplicantField('dVisaBookingAppointment', event.target.value)}
+                  >
+                    <option value="">Select</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+              </div>
 
-              <label htmlFor="dVisaBookingAppointment">D-Visa booking appointment?</label>
-              <select
-                id="dVisaBookingAppointment"
-                value={applicantForm.dVisaBookingAppointment}
-                onChange={(event) => updateApplicantField('dVisaBookingAppointment', event.target.value)}
-              >
-                <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-              </select>
+              <p className="form-section-label">Notes &amp; Discrepancies</p>
+              <div className="form-grid">
+                <div className="form-field form-field-full">
+                  <label htmlFor="notes">
+                    Notes <span className="optional-hint">(requirements, missing documents, data discrepancies)</span>
+                  </label>
+                  <textarea
+                    id="notes"
+                    rows="4"
+                    placeholder="e.g. Passport scan pending, birth certificate name spelled differently..."
+                    value={applicantForm.notes}
+                    onChange={(event) => updateApplicantField('notes', event.target.value)}
+                  />
+                </div>
+              </div>
 
               {error && <p className="form-error">{error}</p>}
               {message && <p className="form-success">{message}</p>}
@@ -630,34 +786,13 @@ export default function App() {
                 </button>
               </div>
             </form>
+            )}
 
+            {activeTab === 'search' && (
             <section className="applicant-list" aria-label="Applicant search results">
               <h2>Search Applicants</h2>
-              <div className="applicant-search">
-                <label htmlFor="applicantSearch">Search applicant</label>
-                <div className="applicant-search-row">
-                  <input
-                    id="applicantSearch"
-                    value={applicantSearch}
-                    onChange={(event) => setApplicantSearch(event.target.value)}
-                    placeholder="Search name, passport, email, phone, location"
-                  />
-                </div>
-                {applicantNameSuggestions.length > 0 && (
-                  <div className="applicant-suggestions" aria-label="Applicant name suggestions">
-                    {applicantNameSuggestions.map((suggestion) => (
-                      <button
-                        type="button"
-                        className="suggestion-button"
-                        key={suggestion}
-                        onClick={() => setApplicantSearch(suggestion)}
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {error && <p className="form-error">{error}</p>}
+              {message && <p className="form-success">{message}</p>}
               {displayedApplicants.length === 0 ? (
                 <p className="empty-state">
                   {hasApplicantSearch ? 'No matching applicants found.' : 'Search for an applicant to show saved details.'}
@@ -676,7 +811,7 @@ export default function App() {
                         }
 
                         return (
-                          <p key={key}>
+                          <p key={key} className={key === 'notes' ? 'applicant-notes' : undefined}>
                             <strong>{label}:</strong> {value}
                           </p>
                         );
@@ -702,6 +837,7 @@ export default function App() {
                 </div>
               )}
             </section>
+            )}
           </div>
         </section>
       </main>

@@ -272,6 +272,95 @@ test('stores Hungary appointment answers for an applicant', async () => {
   expect(response.body.applicant.dVisaBookingAppointment).toBe('No');
 });
 
+test('stores notes for an applicant', async () => {
+  const token = await registerAndLogin();
+
+  const response = await request(app)
+    .post('/api/applicants')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      firstName: 'Maria',
+      lastName: 'Reyes',
+      dateOfBirth: '1997-05-20',
+      sex: 'Female',
+      phoneNumber: '9171234567',
+      emailAddress: 'maria@example.com',
+      passportNumber: 'P1234567',
+      education: 'Bachelor of Science in Nursing',
+      notes: 'Passport scan pending. Birth certificate spells surname as "Reyez".',
+    });
+
+  expect(response.status).toBe(201);
+  expect(response.body.applicant.notes).toBe(
+    'Passport scan pending. Birth certificate spells surname as "Reyez".',
+  );
+});
+
+test('rejects a duplicate applicant with the same full name and email', async () => {
+  const token = await registerAndLogin();
+
+  const applicantPayload = {
+    firstName: 'Maria',
+    middleName: 'Santos',
+    lastName: 'Reyes',
+    dateOfBirth: '1997-05-20',
+    sex: 'Female',
+    phoneNumber: '9171234567',
+    emailAddress: 'maria@example.com',
+    passportNumber: 'P1234567',
+    education: 'Bachelor of Science in Nursing',
+  };
+
+  const firstResponse = await request(app)
+    .post('/api/applicants')
+    .set('Authorization', `Bearer ${token}`)
+    .send(applicantPayload);
+
+  expect(firstResponse.status).toBe(201);
+
+  const duplicateResponse = await request(app)
+    .post('/api/applicants')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ ...applicantPayload, passportNumber: 'P9999999' });
+
+  expect(duplicateResponse.status).toBe(409);
+  expect(duplicateResponse.body.message).toBe('An applicant with the same full name and email already exists');
+
+  const listResponse = await request(app)
+    .get('/api/applicants')
+    .set('Authorization', `Bearer ${token}`);
+
+  expect(listResponse.body.applicants).toHaveLength(1);
+});
+
+test('allows a new applicant when the email differs from an existing full name', async () => {
+  const token = await registerAndLogin();
+
+  const applicantPayload = {
+    firstName: 'Maria',
+    middleName: 'Santos',
+    lastName: 'Reyes',
+    dateOfBirth: '1997-05-20',
+    sex: 'Female',
+    phoneNumber: '9171234567',
+    emailAddress: 'maria@example.com',
+    passportNumber: 'P1234567',
+    education: 'Bachelor of Science in Nursing',
+  };
+
+  await request(app)
+    .post('/api/applicants')
+    .set('Authorization', `Bearer ${token}`)
+    .send(applicantPayload);
+
+  const response = await request(app)
+    .post('/api/applicants')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ ...applicantPayload, emailAddress: 'maria.reyes@example.com' });
+
+  expect(response.status).toBe(201);
+});
+
 test('deletes an applicant saved by the logged-in user', async () => {
   const token = await registerAndLogin();
 

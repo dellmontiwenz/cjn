@@ -123,6 +123,11 @@ const applicantSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    notes: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     createdBy: {
       type: String,
       required: true,

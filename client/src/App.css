@@ -169,10 +169,30 @@ button:disabled {
   margin: 0.75rem 0 0;
 }
 
-.dashboard-grid {
-  display: grid;
-  gap: 1.5rem;
-  grid-template-columns: minmax(280px, 420px) 1fr;
+.dashboard-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.tab-button {
+  background: #ede9fe;
+  color: #5b21b6;
+  margin: 0;
+}
+
+.tab-button.active {
+  background: #6d28d9;
+  color: #fff;
+}
+
+.dashboard-search {
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-content {
+  width: 100%;
 }
 
 .applicant-form,
@@ -181,6 +201,33 @@ button:disabled {
   border: 1px solid #ebe9ff;
   border-radius: 22px;
   padding: 1.5rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.9rem 1.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.form-field {
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+}
+
+.form-field-phone {
+  grid-column: span 2;
+}
+
+.form-field-full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 560px) {
+  .form-field-phone {
+    grid-column: auto;
+  }
 }
 
 .secondary-button {
@@ -303,6 +350,8 @@ h2 {
 .applicant-cards {
   display: grid;
   gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  align-items: start;
 }
 
 .applicant-card {
@@ -319,6 +368,10 @@ h2 {
 .applicant-card p {
   color: #4b5563;
   margin: 0.35rem 0;
+}
+
+.applicant-card p.applicant-notes {
+  white-space: pre-wrap;
 }
 
 @media (max-width: 850px) {
