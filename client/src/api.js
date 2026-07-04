@@ -1,12 +1,12 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_URL}${path}`, {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     },
-    ...options,
   });
 
   const data = await response.json();
@@ -37,5 +37,42 @@ export function getCurrentUser(token) {
     headers: {
       Authorization: `Bearer ${token}`,
     },
+  });
+}
+
+export function getApplicants(token) {
+  return request('/api/applicants', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export function createApplicant(token, applicant) {
+  return request('/api/applicants', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(applicant),
+  });
+}
+
+export function deleteApplicant(token, applicantId) {
+  return request(`/api/applicants/${applicantId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export function updateApplicant(token, applicantId, applicant) {
+  return request(`/api/applicants/${applicantId}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(applicant),
   });
 }

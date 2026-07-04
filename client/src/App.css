@@ -13,7 +13,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -70,16 +72,24 @@ label {
   font-weight: 700;
 }
 
-input {
+input,
+select,
+textarea {
   border: 1px solid #d8d6f5;
   border-radius: 14px;
   padding: 0.9rem 1rem;
 }
 
-input:focus {
+input:focus,
+select:focus,
+textarea:focus {
   border-color: #7c3aed;
   box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
   outline: none;
+}
+
+textarea {
+  resize: vertical;
 }
 
 button {
@@ -130,4 +140,198 @@ button:disabled {
 
 .success-card {
   text-align: center;
+}
+
+.dashboard-shell {
+  align-items: flex-start;
+}
+
+.dashboard-panel {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 28px;
+  box-shadow: 0 24px 80px rgba(79, 70, 229, 0.18);
+  max-width: 1100px;
+  padding: 2rem;
+  width: 100%;
+}
+
+.dashboard-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.dashboard-header p {
+  color: #6b7280;
+  margin: 0.75rem 0 0;
+}
+
+.dashboard-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(280px, 420px) 1fr;
+}
+
+.applicant-form,
+.applicant-list {
+  background: #ffffff;
+  border: 1px solid #ebe9ff;
+  border-radius: 22px;
+  padding: 1.5rem;
+}
+
+.secondary-button {
+  background: #6d28d9;
+  margin: 0 0 1rem;
+}
+
+.applicant-search {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.applicant-search-row {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+.applicant-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.suggestion-button {
+  background: #ede9fe;
+  color: #5b21b6;
+  margin: 0;
+  padding: 0.55rem 0.85rem;
+}
+
+.phone-input-row {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(200px, 240px) 1fr;
+}
+
+.phone-country-code {
+  min-width: 0;
+  padding-right: 2rem;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+  .phone-input-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.optional-hint {
+  color: #9ca3af;
+  font-weight: 500;
+  text-transform: none;
+}
+
+.input-invalid {
+  border-color: #dc2626;
+}
+
+.input-invalid:focus {
+  outline-color: #dc2626;
+}
+
+.field-error {
+  color: #dc2626;
+  font-size: 0.82rem;
+  margin: -0.25rem 0 0;
+}
+
+.form-section-label {
+  color: #6d28d9;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  margin: 0.5rem 0 0;
+  text-transform: uppercase;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.form-actions .secondary-button {
+  margin: 0;
+}
+
+.applicant-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.applicant-card-actions .secondary-button,
+.applicant-card-actions .danger-button {
+  margin: 0;
+}
+
+.danger-button {
+  background: #dc2626;
+}
+
+h2 {
+  color: #111827;
+  font-size: 1.35rem;
+  margin: 0 0 1rem;
+}
+
+.empty-state {
+  background: #f8fafc;
+  border-radius: 16px;
+  color: #64748b;
+  margin: 0;
+  padding: 1rem;
+}
+
+.applicant-cards {
+  display: grid;
+  gap: 1rem;
+}
+
+.applicant-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 1rem;
+}
+
+.applicant-card h3 {
+  color: #111827;
+  margin: 0 0 0.75rem;
+}
+
+.applicant-card p {
+  color: #4b5563;
+  margin: 0.35rem 0;
+}
+
+@media (max-width: 850px) {
+  .dashboard-grid,
+  .dashboard-header {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-header {
+    display: grid;
+  }
+
+  .applicant-search-row {
+    grid-template-columns: 1fr;
+  }
 }
