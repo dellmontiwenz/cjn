@@ -250,6 +250,7 @@ export default function App() {
   const [mode, setMode] = useState('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [user, setUser] = useState(null);
@@ -282,6 +283,7 @@ export default function App() {
     setApplicantForm(emptyApplicant);
     setUsername('');
     setPassword('');
+    setAdminPassword('');
     setError('');
     setMessage(dueToInactivity ? 'You were logged out after 5 minutes of inactivity.' : '');
   }, []);
@@ -376,6 +378,11 @@ export default function App() {
       return;
     }
 
+    if (!isLogin && !adminPassword) {
+      setError('Administration password is required to create an account');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -387,9 +394,10 @@ export default function App() {
         const applicantData = await getApplicants(data.token);
         setApplicants(applicantData.applicants);
       } else {
-        await registerUser({ username, password });
+        await registerUser({ username, password, adminPassword });
         setMode('login');
         setPassword('');
+        setAdminPassword('');
         setMessage('Account created. You can log in now.');
       }
     } catch (submitError) {
@@ -552,7 +560,7 @@ export default function App() {
             <div>
               <p className="eyebrow">Dashboard</p>
               <h1>Applicant Dashboard</h1>
-              <p>You are logged in as {user.username}.</p>
+              <p>You are logged in as {user.username}{user.isAdmin ? ' (Admin)' : ''}.</p>
             </div>
             <button type="button" onClick={handleLogout}>
               Log out
@@ -1014,7 +1022,9 @@ export default function App() {
         <p className="eyebrow">CJN Studio</p>
         <h1>{isLogin ? 'Welcome back' : 'Create your account'}</h1>
         <p className="subtitle">
-          {isLogin ? 'Log in to continue to your workspace.' : 'Start with a username and secure password.'}
+          {isLogin
+            ? 'Log in to continue to your workspace.'
+            : 'Enter an administration password to create a new user account.'}
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -1035,6 +1045,19 @@ export default function App() {
             placeholder="Enter your password"
           />
 
+          {!isLogin && (
+            <>
+              <label htmlFor="adminPassword">Administration password</label>
+              <input
+                id="adminPassword"
+                type="password"
+                value={adminPassword}
+                onChange={(event) => setAdminPassword(event.target.value)}
+                placeholder="Enter the administration password"
+              />
+            </>
+          )}
+
           {error && <p className="form-error">{error}</p>}
           {message && <p className="form-success">{message}</p>}
 
@@ -1050,6 +1073,7 @@ export default function App() {
             className="link-button"
             onClick={() => {
               setMode(isLogin ? 'register' : 'login');
+              setAdminPassword('');
               setError('');
               setMessage('');
             }}

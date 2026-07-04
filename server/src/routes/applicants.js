@@ -37,10 +37,6 @@ function isDuplicateApplicant(existingApplicants, applicantData, excludeId) {
       return false;
     }
 
-    if (applicant.createdBy !== applicantData.createdBy) {
-      return false;
-    }
-
     return applicantFullName(applicant) === targetName && normalizeEmail(applicant.emailAddress) === targetEmail;
   });
 }
@@ -152,7 +148,7 @@ export function createApplicantsRouter(applicantModel = Applicant) {
         return res.status(400).json({ message: validationError });
       }
 
-      const existingApplicants = await applicantModel.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
+      const existingApplicants = await applicantModel.find({}).sort({ createdAt: -1 });
       if (isDuplicateApplicant(existingApplicants, applicantData)) {
         return res.status(409).json({ message: duplicateMessage });
       }
@@ -167,7 +163,7 @@ export function createApplicantsRouter(applicantModel = Applicant) {
 
   applicantsRouter.get('/', async (req, res, next) => {
     try {
-      const applicants = await applicantModel.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
+      const applicants = await applicantModel.find({}).sort({ createdAt: -1 });
 
       return res.json({ applicants: applicants.map(serializeApplicant) });
     } catch (error) {
@@ -184,17 +180,22 @@ export function createApplicantsRouter(applicantModel = Applicant) {
         return res.status(400).json({ message: validationError });
       }
 
-      const existingApplicants = await applicantModel.find({ createdBy: req.user.id }).sort({ createdAt: -1 });
+      const existingApplicants = await applicantModel.find({}).sort({ createdAt: -1 });
       if (isDuplicateApplicant(existingApplicants, applicantData, req.params.id)) {
         return res.status(409).json({ message: duplicateMessage });
       }
 
+      const currentApplicant = await applicantModel.findOne({ _id: req.params.id });
+      if (!currentApplicant) {
+        return res.status(404).json({ message: 'Applicant not found' });
+      }
+
       const updatedApplicant = await applicantModel.findOneAndUpdate(
+        { _id: req.params.id },
         {
-          _id: req.params.id,
-          createdBy: req.user.id,
+          ...applicantData,
+          createdBy: currentApplicant.createdBy,
         },
-        applicantData,
       );
 
       if (!updatedApplicant) {
@@ -211,7 +212,6 @@ export function createApplicantsRouter(applicantModel = Applicant) {
     try {
       const deletedApplicant = await applicantModel.findOneAndDelete({
         _id: req.params.id,
-        createdBy: req.user.id,
       });
 
       if (!deletedApplicant) {

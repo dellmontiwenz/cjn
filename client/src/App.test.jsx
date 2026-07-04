@@ -934,7 +934,7 @@ test('blocks saving when the email or phone number is invalid', async () => {
   expect(fetch).toHaveBeenCalledTimes(2);
 });
 
-test('switches to register and creates an account', async () => {
+test('switches to register and creates an account with an administration password', async () => {
   fetch.mockResolvedValueOnce({
     ok: true,
     json: async () => ({ message: 'User registered successfully' }),
@@ -945,10 +945,28 @@ test('switches to register and creates an account', async () => {
 
   await user.click(screen.getByRole('button', { name: /create one/i }));
   await user.type(screen.getByLabelText(/username/i), 'newuser');
-  await user.type(screen.getByLabelText(/password/i), 'password123');
+  await user.type(screen.getByLabelText(/^password$/i), 'password123');
+  await user.type(screen.getByLabelText(/administration password/i), 'admin-secret-123');
   await user.click(screen.getByRole('button', { name: /create account/i }));
 
   await waitFor(() => {
     expect(screen.getByText('Account created. You can log in now.')).toBeInTheDocument();
   });
+
+  const [, registerOptions] = fetch.mock.calls.at(-1);
+  const body = JSON.parse(registerOptions.body);
+  expect(body.adminPassword).toBe('admin-secret-123');
+});
+
+test('blocks registration when the administration password is missing', async () => {
+  const user = userEvent.setup();
+  render(<App />);
+
+  await user.click(screen.getByRole('button', { name: /create one/i }));
+  await user.type(screen.getByLabelText(/username/i), 'newuser');
+  await user.type(screen.getByLabelText(/^password$/i), 'password123');
+  await user.click(screen.getByRole('button', { name: /create account/i }));
+
+  expect(screen.getByText('Administration password is required to create an account')).toBeInTheDocument();
+  expect(fetch).not.toHaveBeenCalled();
 });

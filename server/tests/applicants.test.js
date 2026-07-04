@@ -42,8 +42,11 @@ function createMemoryApplicantModel() {
         sort: async () => applicants,
       };
     },
-    async findOneAndDelete({ _id, createdBy }) {
-      const index = applicants.findIndex((applicant) => applicant._id.toString() === _id && applicant.createdBy === createdBy);
+    async findOne({ _id }) {
+      return applicants.find((applicant) => applicant._id.toString() === _id) || null;
+    },
+    async findOneAndDelete({ _id }) {
+      const index = applicants.findIndex((applicant) => applicant._id.toString() === _id);
 
       if (index === -1) {
         return null;
@@ -52,8 +55,8 @@ function createMemoryApplicantModel() {
       const [deletedApplicant] = applicants.splice(index, 1);
       return deletedApplicant;
     },
-    async findOneAndUpdate({ _id, createdBy }, data) {
-      const index = applicants.findIndex((applicant) => applicant._id.toString() === _id && applicant.createdBy === createdBy);
+    async findOneAndUpdate({ _id }, data) {
+      const index = applicants.findIndex((applicant) => applicant._id.toString() === _id);
 
       if (index === -1) {
         return null;
@@ -72,7 +75,11 @@ function createMemoryApplicantModel() {
 async function registerAndLogin(username = 'wendell') {
   await request(app)
     .post('/api/auth/register')
-    .send({ username, password: 'password123' });
+    .send({
+      username,
+      password: 'password123',
+      adminPassword: process.env.ADMIN_REGISTRATION_PASSWORD || 'admin-secret-123',
+    });
 
   const response = await request(app)
     .post('/api/auth/login')
@@ -83,6 +90,7 @@ async function registerAndLogin(username = 'wendell') {
 
 beforeEach(() => {
   process.env.JWT_SECRET = 'test-secret';
+  process.env.ADMIN_REGISTRATION_PASSWORD = 'admin-secret-123';
   User = createMemoryUserModel();
   Applicant = createMemoryApplicantModel();
   app = createApp({ userModel: User, applicantModel: Applicant });
@@ -181,6 +189,34 @@ test('lists applicants saved by the logged-in user', async () => {
   expect(response.body.applicants).toHaveLength(1);
   expect(response.body.applicants[0].firstName).toBe('Maria');
   expect(response.body.applicants[0].passportNumber).toBe('P1234567');
+});
+
+test('lets any logged-in user access applicants saved by another user', async () => {
+  const adminToken = await registerAndLogin('dellmonti1106');
+
+  await request(app)
+    .post('/api/applicants')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .send({
+      firstName: 'Maria',
+      lastName: 'Reyes',
+      dateOfBirth: '1997-05-20',
+      sex: 'Female',
+      phoneNumber: '9171234567',
+      emailAddress: 'maria@example.com',
+      passportNumber: 'P1234567',
+      education: 'Bachelor of Science in Nursing',
+    });
+
+  const staffToken = await registerAndLogin('staffuser');
+
+  const response = await request(app)
+    .get('/api/applicants')
+    .set('Authorization', `Bearer ${staffToken}`);
+
+  expect(response.status).toBe(200);
+  expect(response.body.applicants).toHaveLength(1);
+  expect(response.body.applicants[0].firstName).toBe('Maria');
 });
 
 test('rejects an applicant with an invalid email address', async () => {

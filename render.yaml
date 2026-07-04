@@ -21,3 +21,7 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: ADMIN_REGISTRATION_PASSWORD
+        sync: false
+      - key: ADMIN_USERNAME
+        value: dellmonti1106
