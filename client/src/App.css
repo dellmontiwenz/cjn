@@ -21,13 +21,60 @@ textarea {
 
 .page-shell {
   align-items: center;
-  background:
-    radial-gradient(circle at top left, rgba(116, 67, 255, 0.22), transparent 34rem),
-    linear-gradient(135deg, #f8f4ff 0%, #fff7fb 52%, #eef7ff 100%);
+  background: transparent;
   display: flex;
+  isolation: isolate;
   justify-content: center;
   min-height: 100vh;
   padding: 2rem;
+  position: relative;
+  z-index: 1;
+}
+
+.page-photo-bg {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(2, minmax(220px, 1fr));
+  inset: 0;
+  min-height: 100vh;
+  pointer-events: none;
+  position: fixed;
+  z-index: 0;
+}
+
+.page-photo-bg span {
+  background-position: center;
+  background-size: cover;
+  min-height: 220px;
+  opacity: 0.52;
+}
+
+.page-photo-bg span:nth-child(5) {
+  grid-column: span 2;
+}
+
+.page-photo-bg::after {
+  background:
+    radial-gradient(circle at top left, rgba(116, 67, 255, 0.16), transparent 34rem),
+    linear-gradient(135deg, rgba(248, 244, 255, 0.62) 0%, rgba(255, 247, 251, 0.68) 52%, rgba(238, 247, 255, 0.64) 100%);
+  content: '';
+  inset: 0;
+  position: absolute;
+}
+
+@media (max-width: 900px) {
+  .page-photo-bg {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(4, minmax(160px, 1fr));
+  }
+
+  .page-photo-bg span:nth-child(5) {
+    grid-column: span 1;
+  }
+
+  .page-photo-bg span:nth-child(7) {
+    grid-column: span 2;
+  }
 }
 
 .auth-card {

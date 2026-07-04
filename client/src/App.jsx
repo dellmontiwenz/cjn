@@ -8,6 +8,7 @@ import {
   registerUser,
   updateApplicant,
 } from './api.js';
+import PageBackground from './PageBackground.jsx';
 
 const inactivityTimeoutMs = 5 * 60 * 1000;
 
@@ -592,17 +593,22 @@ export default function App() {
 
   if (isRestoringSession) {
     return (
-      <main className="page-shell">
-        <section className="auth-card">
-          <p className="subtitle">Restoring your session...</p>
-        </section>
-      </main>
+      <>
+        <PageBackground />
+        <main className="page-shell">
+          <section className="auth-card">
+            <p className="subtitle">Restoring your session...</p>
+          </section>
+        </main>
+      </>
     );
   }
 
   if (user) {
     return (
-      <main className="page-shell dashboard-shell">
+      <>
+        <PageBackground />
+        <main className="page-shell dashboard-shell">
         <section className="dashboard-panel">
           <div className="dashboard-header">
             <div>
@@ -1087,11 +1093,14 @@ export default function App() {
           </div>
         </section>
       </main>
+      </>
     );
   }
 
   return (
-    <main className="page-shell">
+    <>
+      <PageBackground />
+      <main className="page-shell">
       <section className="auth-card">
         <p className="eyebrow">CJN Studio</p>
         <h1>{isLogin ? 'Welcome back' : 'Create your account'}</h1>
@@ -1157,5 +1166,6 @@ export default function App() {
         </p>
       </section>
     </main>
+    </>
   );
 }
