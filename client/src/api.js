@@ -1,5 +1,28 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
+function parseContentDispositionFileName(contentDisposition) {
+  if (!contentDisposition) {
+    return null;
+  }
+
+  const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition);
+  if (utf8Match) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+
+  const quotedMatch = /filename="([^"]+)"/.exec(contentDisposition);
+  if (quotedMatch) {
+    return quotedMatch[1];
+  }
+
+  const unquotedMatch = /filename=([^;]+)/.exec(contentDisposition);
+  if (unquotedMatch) {
+    return unquotedMatch[1].trim();
+  }
+
+  return null;
+}
+
 async function request(path, options = {}) {
   let response;
 
@@ -147,4 +170,42 @@ export function deleteApplicantDocument(token, applicantId, documentType) {
       Authorization: `Bearer ${token}`,
     },
   });
+}
+
+export async function exportApplicantWord(token, applicantId) {
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}/api/applicants/${applicantId}/export/word`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch {
+    throw new Error(
+      `Cannot reach the server at ${API_URL}. If you are running locally, start the backend with "npm run dev:server".`,
+    );
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || 'Word export failed');
+  }
+
+  const blob = await response.blob();
+  const savedPath = response.headers.get('X-CJN-Saved-Path') || '';
+  const contentDisposition = response.headers.get('Content-Disposition') || '';
+  const fileName =
+    response.headers.get('X-CJN-Filename')
+    || parseContentDispositionFileName(contentDisposition)
+    || 'applicant.docx';
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = fileName;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+
+  return { fileName, savedPath };
 }

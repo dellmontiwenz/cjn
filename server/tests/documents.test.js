@@ -1,6 +1,11 @@
 import request from 'supertest';
+import JSZip from 'jszip';
 import { createApp } from '../src/app.js';
 import { createMemoryDocumentStorage } from '../src/services/documentStorage.js';
+
+const samplePdfBuffer = Buffer.from(
+  '%PDF-1.1\n1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj\n3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R /Resources<< /Font<< /F1 5 0 R >> >> >>endobj\n4 0 obj<< /Length 44 >>stream\nBT /F1 24 Tf 20 100 Td (Hi) Tj ET\nendstream\nendobj\n5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\nxref\n0 6\n0000000000 65535 f \n0000000010 00000 n \n0000000060 00000 n \n0000000117 00000 n \n0000000274 00000 n \n0000000373 00000 n \ntrailer<< /Size 6 /Root 1 0 R >>\nstartxref\n445\n%%EOF',
+);
 
 let User;
 let Applicant;
@@ -226,4 +231,62 @@ test('returns 503 when cloud storage is not configured', async () => {
     .attach('file', Buffer.from('%PDF-1.4'), { filename: 'passport.pdf', contentType: 'application/pdf' });
 
   expect(response.status).toBe(503);
+});
+
+test('exports applicant profile to Word and saves it in the applicant folder', async () => {
+  const token = await registerAndLogin();
+  const applicant = await createSampleApplicant(token);
+
+  const exportWithoutPhotoResponse = await request(app)
+    .post(`/api/applicants/${applicant.id}/export/word`)
+    .set('Authorization', `Bearer ${token}`);
+
+  expect(exportWithoutPhotoResponse.status).toBe(200);
+  expect(Number(exportWithoutPhotoResponse.headers['content-length'])).toBeGreaterThan(100);
+
+  const photoDataUrl =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  await request(app)
+    .put(`/api/applicants/${applicant.id}`)
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      firstName: 'Maria',
+      middleName: 'Santos',
+      lastName: 'Reyes',
+      dateOfBirth: '1997-05-20',
+      sex: 'Female',
+      phoneCountryCode: '+63',
+      phoneNumber: '9171234567',
+      emailAddress: 'maria.reyes@example.com',
+      passportNumber: 'P1234567',
+      education: 'Bachelor of Science',
+      photo: photoDataUrl,
+    });
+
+  await request(app)
+    .post(`/api/applicants/${applicant.id}/documents/tor`)
+    .set('Authorization', `Bearer ${token}`)
+    .attach('file', samplePdfBuffer, { filename: 'tor.pdf', contentType: 'application/pdf' });
+
+  const exportResponse = await request(app)
+    .post(`/api/applicants/${applicant.id}/export/word`)
+    .set('Authorization', `Bearer ${token}`)
+    .buffer()
+    .parse((response, callback) => {
+      const chunks = [];
+      response.on('data', (chunk) => chunks.push(chunk));
+      response.on('end', () => callback(null, Buffer.concat(chunks)));
+    });
+
+  expect(exportResponse.status).toBe(200);
+  expect(exportResponse.headers['content-type']).toContain('wordprocessingml');
+  expect(Number(exportResponse.headers['content-length'])).toBeGreaterThan(100);
+  expect(exportResponse.headers['x-cjn-saved-path']).toBe('Maria Santos Reyes/Maria Santos Reyes.docx');
+  expect(exportResponse.headers['x-cjn-filename']).toBe('Maria Santos Reyes.docx');
+
+  const zip = await JSZip.loadAsync(exportResponse.body);
+  const documentXml = await zip.file('word/document.xml').async('string');
+  expect(documentXml).not.toMatch(/<\/w:p><w:r>/);
+  expect(documentXml).toMatch(/<w:p><w:r><w:br w:type="page"\/><\/w:r><\/w:p>/);
 });

@@ -1,4 +1,5 @@
 import multer from 'multer';
+import { exportApplicantToWord } from '../services/applicantWordExport.js';
 import { documentTypes } from '../services/documentStorage.js';
 
 const maxDocumentBytes = 10 * 1024 * 1024;
@@ -77,6 +78,37 @@ function storageUnavailableResponse(res) {
 }
 
 export function registerApplicantDocumentRoutes(applicantsRouter, applicantModel, documentStorage) {
+  applicantsRouter.post('/:id/export/word', async (req, res, next) => {
+    try {
+      if (!documentStorage?.isConfigured) {
+        return storageUnavailableResponse(res);
+      }
+
+      const applicant = await applicantModel.findOne({ _id: req.params.id });
+      if (!applicant) {
+        return res.status(404).json({ message: 'Applicant not found' });
+      }
+
+      const { buffer, fileName, relativePath } = await exportApplicantToWord(applicant, documentStorage);
+
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
+      const safeFileName = fileName.replace(/"/g, '');
+      const encodedFileName = encodeURIComponent(safeFileName);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodedFileName}`,
+      );
+      res.setHeader('X-CJN-Filename', safeFileName);
+      res.setHeader('X-CJN-Saved-Path', relativePath);
+      return res.send(buffer);
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   applicantsRouter.post('/:id/documents/:documentType', upload.single('file'), async (req, res, next) => {
     try {
       if (!documentStorage?.isConfigured) {

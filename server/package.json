@@ -6,13 +6,16 @@
     "test": "NODE_ENV=test NODE_NO_WARNINGS=1 node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand"
   },
   "dependencies": {
+    "@napi-rs/canvas": "^1.0.2",
     "bcryptjs": "latest",
     "cors": "latest",
+    "docx": "^9.7.1",
     "dotenv": "latest",
     "express": "latest",
     "jsonwebtoken": "latest",
     "mongoose": "latest",
-    "multer": "^2.2.0"
+    "multer": "^2.2.0",
+    "pdfjs-dist": "^6.1.200"
   },
   "devDependencies": {
     "jest": "latest",

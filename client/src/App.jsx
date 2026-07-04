@@ -3,6 +3,7 @@ import {
   createApplicant,
   deleteApplicant,
   deleteApplicantDocument,
+  exportApplicantWord,
   getApplicants,
   getCurrentUser,
   loginUser,
@@ -298,6 +299,7 @@ export default function App() {
   const [isSavingApplicant, setIsSavingApplicant] = useState(false);
   const [uploadingDocumentKey, setUploadingDocumentKey] = useState('');
   const [pendingDocuments, setPendingDocuments] = useState(emptyPendingDocuments);
+  const [exportingApplicantId, setExportingApplicantId] = useState('');
   const [isRestoringSession, setIsRestoringSession] = useState(() => Boolean(localStorage.getItem('authToken')));
   const inactivityTimerRef = useRef(null);
 
@@ -777,6 +779,25 @@ export default function App() {
       await openApplicantDocument(token, applicant.id, documentType);
     } catch (documentError) {
       setError(documentError.message);
+    }
+  }
+
+  async function handleExportWord(applicant) {
+    setError('');
+    setMessage('');
+    setExportingApplicantId(applicant.id);
+
+    try {
+      const data = await exportApplicantWord(token, applicant.id);
+      setMessage(
+        data.savedPath
+          ? `Word file downloaded and saved to cjn/${data.savedPath}.`
+          : `Word file downloaded (${data.fileName}).`,
+      );
+    } catch (exportError) {
+      setError(exportError.message);
+    } finally {
+      setExportingApplicantId('');
     }
   }
 
@@ -1390,6 +1411,14 @@ export default function App() {
                         </section>
                       )}
                       <div className="applicant-card-actions">
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={exportingApplicantId === applicant.id || isSavingApplicant}
+                          onClick={() => handleExportWord(applicant)}
+                        >
+                          {exportingApplicantId === applicant.id ? 'Exporting...' : 'Export to Word'}
+                        </button>
                         <button
                           type="button"
                           className="secondary-button"
