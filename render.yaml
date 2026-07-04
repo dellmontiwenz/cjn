@@ -10,8 +10,9 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.11.1
-      # Set these two in the Render dashboard (they are secrets):
-      #   MONGODB_URI    -> your MongoDB Atlas connection string
+      # Set these in the Render dashboard (they are secrets):
+      #   MONGODB_URI    -> mongodb+srv://...@cluster0.../?appName=Cluster0
+      #                     (database name wix_login is set automatically in code)
       #   CLIENT_ORIGIN  -> your Vercel URL, e.g. https://cjn.vercel.app
       #                     (comma-separate to allow more than one origin)
       - key: MONGODB_URI
