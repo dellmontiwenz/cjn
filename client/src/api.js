@@ -84,3 +84,67 @@ export function updateApplicant(token, applicantId, applicant) {
     body: JSON.stringify(applicant),
   });
 }
+
+export async function uploadApplicantDocument(token, applicantId, documentType, file) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}/api/applicants/${applicantId}/documents/${documentType}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+  } catch {
+    throw new Error(
+      `Cannot reach the server at ${API_URL}. If you are running locally, start the backend with "npm run dev:server".`,
+    );
+  }
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || 'Document upload failed');
+  }
+
+  return data;
+}
+
+export async function openApplicantDocument(token, applicantId, documentType) {
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}/api/applicants/${applicantId}/documents/${documentType}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch {
+    throw new Error(
+      `Cannot reach the server at ${API_URL}. If you are running locally, start the backend with "npm run dev:server".`,
+    );
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || 'Failed to open document');
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  window.open(objectUrl, '_blank', 'noopener,noreferrer');
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+}
+
+export function deleteApplicantDocument(token, applicantId, documentType) {
+  return request(`/api/applicants/${applicantId}/documents/${documentType}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}

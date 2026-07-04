@@ -9,6 +9,15 @@ function line(fullText) {
     element.textContent.replace(/\s+/g, ' ').trim() === fullText;
 }
 
+async function openSearchTab(user) {
+  await user.click(screen.getByRole('button', { name: /search applicants/i }));
+}
+
+async function searchApplicants(user, query) {
+  await openSearchTab(user);
+  await user.type(screen.getByLabelText(/search applicant/i), query);
+}
+
 beforeEach(() => {
   localStorage.clear();
   global.fetch = vi.fn();
@@ -182,9 +191,13 @@ test('loads saved applicants after login and shows them on the search tab', asyn
   });
   expect(screen.queryByText('Maria Santos Reyes')).not.toBeInTheDocument();
 
-  await user.click(screen.getByRole('button', { name: /search applicants/i }));
+  await openSearchTab(user);
+  expect(screen.getByText(/enter a name, passport, email, or phone to search applicants/i)).toBeInTheDocument();
+  expect(screen.queryByText('Maria Santos Reyes')).not.toBeInTheDocument();
 
-  expect(screen.getByText('Maria Santos Reyes')).toBeInTheDocument();
+  await user.type(screen.getByLabelText(/search applicant/i), 'Maria');
+
+  expect(screen.getByRole('heading', { name: 'Maria Santos Reyes' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /show\/retrieve applicants/i })).not.toBeInTheDocument();
 });
 
@@ -485,6 +498,11 @@ test('uploads a photo and shows it on the saved applicant', async () => {
   await user.click(screen.getByRole('button', { name: /save applicant/i }));
 
   await waitFor(() => {
+    expect(screen.getByText('Applicant saved.')).toBeInTheDocument();
+  });
+  await searchApplicants(user, 'Maria Reyes');
+
+  await waitFor(() => {
     expect(screen.getByAltText('Maria Reyes photo').getAttribute('src')).toBe(photoDataUrl);
   });
 
@@ -547,7 +565,7 @@ test('removes a saved applicant photo from the search card', async () => {
   await user.type(screen.getByLabelText(/username/i), 'wendell');
   await user.type(screen.getByLabelText(/password/i), 'password123');
   await user.click(screen.getByRole('button', { name: /log in/i }));
-  await user.click(await screen.findByRole('button', { name: /search applicants/i }));
+  await searchApplicants(user, 'Maria Reyes');
 
   expect(screen.getByAltText('Maria Reyes photo').getAttribute('src')).toBe(photoDataUrl);
   await user.click(screen.getByRole('button', { name: /^remove photo$/i }));
@@ -616,7 +634,7 @@ test('removes a photo while editing and saves the default photo', async () => {
   await user.type(screen.getByLabelText(/username/i), 'wendell');
   await user.type(screen.getByLabelText(/password/i), 'password123');
   await user.click(screen.getByRole('button', { name: /log in/i }));
-  await user.click(await screen.findByRole('button', { name: /search applicants/i }));
+  await searchApplicants(user, 'Maria Reyes');
   await user.click(screen.getByRole('button', { name: /edit maria reyes/i }));
 
   expect(screen.getByAltText('Applicant photo preview').getAttribute('src')).toBe(photoDataUrl);
@@ -625,7 +643,7 @@ test('removes a photo while editing and saves the default photo', async () => {
   await user.click(screen.getByRole('button', { name: /update applicant/i }));
 
   await waitFor(() => {
-    expect(screen.getByText('Applicant updated in MongoDB.')).toBeInTheDocument();
+    expect(screen.getByText('Applicant updated.')).toBeInTheDocument();
   });
 
   const [, updateOptions] = fetch.mock.calls.at(-1);
@@ -684,7 +702,12 @@ test('creates an applicant and shows saved applicant information', async () => {
   await user.click(screen.getByRole('button', { name: /save applicant/i }));
 
   await waitFor(() => {
-    expect(screen.getByText('Maria Santos Reyes')).toBeInTheDocument();
+    expect(screen.getByText('Applicant saved.')).toBeInTheDocument();
+  });
+  await searchApplicants(user, 'Maria Santos');
+
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: 'Maria Santos Reyes' })).toBeInTheDocument();
   });
   expect(screen.getByText(line('Passport: P1234567'))).toBeInTheDocument();
   expect(screen.getByText(line('Education: Bachelor of Science in Nursing'))).toBeInTheDocument();
@@ -751,7 +774,12 @@ test('creates an applicant with a country code prefixed to the phone number', as
   await user.click(screen.getByRole('button', { name: /save applicant/i }));
 
   await waitFor(() => {
-    expect(screen.getByText('Anna Wong')).toBeInTheDocument();
+    expect(screen.getByText('Applicant saved.')).toBeInTheDocument();
+  });
+  await searchApplicants(user, 'Anna Wong');
+
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: 'Anna Wong' })).toBeInTheDocument();
   });
   expect(screen.getByText(line('Phone: +852 98765432'))).toBeInTheDocument();
 
@@ -815,7 +843,12 @@ test('saves Hungary appointment yes/no answers and shows them', async () => {
   await user.click(screen.getByRole('button', { name: /save applicant/i }));
 
   await waitFor(() => {
-    expect(screen.getByText('Maria Reyes')).toBeInTheDocument();
+    expect(screen.getByText('Applicant saved.')).toBeInTheDocument();
+  });
+  await searchApplicants(user, 'Maria Reyes');
+
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: 'Maria Reyes' })).toBeInTheDocument();
   });
   expect(screen.getByText(line('Authentication of Signature appointment: Yes'))).toBeInTheDocument();
   expect(screen.getByText(line('D-Visa booking appointment: No'))).toBeInTheDocument();
@@ -881,7 +914,12 @@ test('saves notes about applicant requirements and shows them', async () => {
   await user.click(screen.getByRole('button', { name: /save applicant/i }));
 
   await waitFor(() => {
-    expect(screen.getByText('Maria Reyes')).toBeInTheDocument();
+    expect(screen.getByText('Applicant saved.')).toBeInTheDocument();
+  });
+  await searchApplicants(user, 'Maria Reyes');
+
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: 'Maria Reyes' })).toBeInTheDocument();
   });
   expect(
     screen.getByText(line('Notes: Passport scan pending. Surname spelled differently on birth certificate.')),
@@ -1013,8 +1051,9 @@ test('edits a searched applicant and appends new information', async () => {
   await user.click(screen.getByRole('button', { name: /update applicant/i }));
 
   await waitFor(() => {
-    expect(screen.getByText('Applicant updated in MongoDB.')).toBeInTheDocument();
+    expect(screen.getByText('Applicant updated.')).toBeInTheDocument();
   });
+  await openSearchTab(user);
   expect(screen.getByText(line('Current location: Singapore'))).toBeInTheDocument();
   expect(screen.getByText(line('Profession: ICU Nurse'))).toBeInTheDocument();
   expect(fetch).toHaveBeenLastCalledWith(

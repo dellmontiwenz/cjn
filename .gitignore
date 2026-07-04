@@ -4,3 +4,4 @@ coverage/
 .cache/
 .env
 .DS_Store
+cjn/

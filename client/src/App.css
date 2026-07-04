@@ -501,6 +501,83 @@ h2 {
   white-space: pre-wrap;
 }
 
+.applicant-documents {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.applicant-documents-form {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.documents-heading {
+  margin: 0 0 0.75rem;
+  color: #111827;
+}
+
+.document-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.document-row-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.document-label {
+  font-weight: 600;
+  color: #111827;
+}
+
+.document-status {
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+}
+
+.document-status.uploaded {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.document-status.missing {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.document-meta {
+  font-size: 0.82rem;
+  color: #6b7280;
+}
+
+.document-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.document-row-actions .photo-upload-label {
+  font-size: 0.82rem;
+  padding: 0.4rem 0.75rem;
+}
+
+.document-row-actions .secondary-button,
+.document-row-actions .danger-button {
+  margin: 0;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.75rem;
+}
+
 @media (max-width: 850px) {
   .dashboard-grid,
   .dashboard-header {

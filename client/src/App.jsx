@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   createApplicant,
   deleteApplicant,
+  deleteApplicantDocument,
   getApplicants,
   getCurrentUser,
   loginUser,
+  openApplicantDocument,
   registerUser,
   updateApplicant,
+  uploadApplicantDocument,
 } from './api.js';
 import PageBackground from './PageBackground.jsx';
 
@@ -56,6 +59,35 @@ const defaultApplicantPhoto =
   );
 
 const maxPhotoBytes = 2 * 1024 * 1024;
+
+const documentDefinitions = [
+  { type: 'tor', label: 'TOR' },
+  { type: 'passport', label: 'Passport' },
+  { type: 'hkid', label: 'HKID' },
+];
+
+const maxDocumentBytes = 10 * 1024 * 1024;
+const allowedDocumentMimeTypes = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
+
+function emptyPendingDocuments() {
+  return {
+    tor: null,
+    passport: null,
+    hkid: null,
+  };
+}
+
+function validateDocumentFile(file) {
+  if (!allowedDocumentMimeTypes.has(file.type)) {
+    return 'Only PDF, JPG, PNG, or WEBP files are allowed';
+  }
+
+  if (file.size > maxDocumentBytes) {
+    return 'Document must be 10 MB or smaller';
+  }
+
+  return null;
+}
 
 const emptyApplicant = {
   firstName: '',
@@ -264,8 +296,22 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('create');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingApplicant, setIsSavingApplicant] = useState(false);
+  const [uploadingDocumentKey, setUploadingDocumentKey] = useState('');
+  const [pendingDocuments, setPendingDocuments] = useState(emptyPendingDocuments);
   const [isRestoringSession, setIsRestoringSession] = useState(() => Boolean(localStorage.getItem('authToken')));
   const inactivityTimerRef = useRef(null);
+
+  function clearPendingDocuments() {
+    setPendingDocuments((currentDocuments) => {
+      Object.values(currentDocuments).forEach((entry) => {
+        if (entry?.objectUrl) {
+          URL.revokeObjectURL(entry.objectUrl);
+        }
+      });
+
+      return emptyPendingDocuments();
+    });
+  }
 
   const handleLogout = useCallback(({ dueToInactivity = false } = {}) => {
     if (inactivityTimerRef.current) {
@@ -282,6 +328,7 @@ export default function App() {
     setEditingApplicantId('');
     setActiveTab('create');
     setApplicantForm(emptyApplicant);
+    clearPendingDocuments();
     setUsername('');
     setPassword('');
     setAdminPassword('');
@@ -347,13 +394,16 @@ export default function App() {
 
   const isLogin = mode === 'login';
   const isEditingApplicant = Boolean(editingApplicantId);
+  const editingApplicant = isEditingApplicant
+    ? applicants.find((applicant) => applicant.id === editingApplicantId)
+    : null;
   const hasApplicantSearch = applicantSearch.trim().length > 0;
   const displayedApplicants = applicants.filter((applicant) => {
     const search = applicantSearch.trim().toLowerCase();
     const fullName = [applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ');
 
     if (!search) {
-      return true;
+      return false;
     }
 
     return [fullName, ...applicantSearchFields.map((field) => applicant[field])]
@@ -449,17 +499,36 @@ export default function App() {
           ),
         );
         setLastSavedApplicantId(data.applicant.id);
-        setEditingApplicantId('');
-        setApplicantForm(emptyApplicant);
-        setActiveTab('search');
-        setMessage('Applicant updated in MongoDB.');
+        setApplicantForm(applicantToForm(data.applicant));
+        setActiveTab('create');
+        setMessage('Applicant updated.');
       } else {
         const data = await createApplicant(token, applicantForm);
-        setApplicants((currentApplicants) => [data.applicant, ...currentApplicants]);
-        setLastSavedApplicantId(data.applicant.id);
-        setApplicantForm(emptyApplicant);
-        setActiveTab('search');
-        setMessage('Applicant saved to MongoDB.');
+        let savedApplicant = data.applicant;
+        let uploadedCount = 0;
+
+        for (const { type } of documentDefinitions) {
+          const pendingEntry = pendingDocuments[type];
+          if (!pendingEntry?.file) {
+            continue;
+          }
+
+          const uploadData = await uploadApplicantDocument(token, savedApplicant.id, type, pendingEntry.file);
+          savedApplicant = { ...savedApplicant, documents: uploadData.documents };
+          uploadedCount += 1;
+        }
+
+        clearPendingDocuments();
+        setApplicants((currentApplicants) => [savedApplicant, ...currentApplicants]);
+        setLastSavedApplicantId(savedApplicant.id);
+        setEditingApplicantId(savedApplicant.id);
+        setApplicantForm(applicantToForm(savedApplicant));
+        setActiveTab('create');
+        setMessage(
+          uploadedCount > 0
+            ? `Applicant saved with ${uploadedCount} document${uploadedCount === 1 ? '' : 's'}.`
+            : 'Applicant saved.',
+        );
       }
     } catch (submitError) {
       setError(submitError.message);
@@ -491,6 +560,7 @@ export default function App() {
   function handleEditApplicant(applicant) {
     setError('');
     setMessage('');
+    clearPendingDocuments();
     setEditingApplicantId(applicant.id);
     setApplicantForm(applicantToForm(applicant));
     setActiveTab('create');
@@ -499,6 +569,7 @@ export default function App() {
   function handleCancelEdit() {
     setEditingApplicantId('');
     setApplicantForm(emptyApplicant);
+    clearPendingDocuments();
     setError('');
     setMessage('');
   }
@@ -589,6 +660,150 @@ export default function App() {
 
   async function handleCardPhotoRemove(applicant) {
     await saveApplicantPhoto(applicant, '');
+  }
+
+  function updateApplicantDocuments(applicantId, documents) {
+    setApplicants((currentApplicants) =>
+      currentApplicants.map((currentApplicant) =>
+        currentApplicant.id === applicantId ? { ...currentApplicant, documents } : currentApplicant,
+      ),
+    );
+  }
+
+  async function handleFormDocumentUpload(documentType, event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    const validationError = validateDocumentFile(file);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    const label = documentDefinitions.find((document) => document.type === documentType)?.label || documentType;
+    setError('');
+    setMessage('');
+
+    if (editingApplicant) {
+      await handleDocumentUpload(editingApplicant, documentType, { target: { files: [file], value: '' } });
+      return;
+    }
+
+    setPendingDocuments((currentDocuments) => {
+      const nextDocuments = { ...currentDocuments };
+      if (nextDocuments[documentType]?.objectUrl) {
+        URL.revokeObjectURL(nextDocuments[documentType].objectUrl);
+      }
+
+      nextDocuments[documentType] = {
+        file,
+        originalName: file.name,
+        mimeType: file.type,
+        size: file.size,
+        objectUrl: URL.createObjectURL(file),
+      };
+
+      return nextDocuments;
+    });
+    setMessage(`${label} selected. It will upload when you save the applicant.`);
+  }
+
+  async function handleFormDocumentView(documentType) {
+    if (editingApplicant?.documents?.[documentType]?.uploaded) {
+      await handleViewDocument(editingApplicant, documentType);
+      return;
+    }
+
+    const pendingEntry = pendingDocuments[documentType];
+    if (pendingEntry?.objectUrl) {
+      window.open(pendingEntry.objectUrl, '_blank', 'noopener,noreferrer');
+    }
+  }
+
+  async function handleFormDocumentDelete(documentType) {
+    const label = documentDefinitions.find((document) => document.type === documentType)?.label || documentType;
+
+    if (editingApplicant?.documents?.[documentType]?.uploaded) {
+      await handleDeleteDocument(editingApplicant, documentType);
+      return;
+    }
+
+    setPendingDocuments((currentDocuments) => {
+      const nextDocuments = { ...currentDocuments };
+      if (nextDocuments[documentType]?.objectUrl) {
+        URL.revokeObjectURL(nextDocuments[documentType].objectUrl);
+      }
+
+      nextDocuments[documentType] = null;
+      return nextDocuments;
+    });
+    setMessage(`${label} removed.`);
+  }
+
+  async function handleDocumentUpload(applicant, documentType, event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    const uploadKey = `${applicant.id}-${documentType}`;
+    setError('');
+    setMessage('');
+    setUploadingDocumentKey(uploadKey);
+
+    try {
+      const data = await uploadApplicantDocument(token, applicant.id, documentType, file);
+      updateApplicantDocuments(applicant.id, data.documents);
+      const label = documentDefinitions.find((document) => document.type === documentType)?.label || documentType;
+      setMessage(`${label} uploaded.`);
+    } catch (documentError) {
+      setError(documentError.message);
+    } finally {
+      setUploadingDocumentKey('');
+    }
+  }
+
+  async function handleViewDocument(applicant, documentType) {
+    setError('');
+    setMessage('');
+
+    try {
+      await openApplicantDocument(token, applicant.id, documentType);
+    } catch (documentError) {
+      setError(documentError.message);
+    }
+  }
+
+  async function handleDeleteDocument(applicant, documentType) {
+    const label = documentDefinitions.find((document) => document.type === documentType)?.label || documentType;
+    const displayName = [applicant.firstName, applicant.middleName, applicant.lastName]
+      .filter(Boolean)
+      .join(' ');
+    const confirmed = window.confirm(`Delete ${label} for ${displayName}?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError('');
+    setMessage('');
+    setUploadingDocumentKey(`${applicant.id}-${documentType}`);
+
+    try {
+      const data = await deleteApplicantDocument(token, applicant.id, documentType);
+      updateApplicantDocuments(applicant.id, data.documents);
+      setMessage(`${label} deleted.`);
+    } catch (documentError) {
+      setError(documentError.message);
+    } finally {
+      setUploadingDocumentKey('');
+    }
   }
 
   if (isRestoringSession) {
@@ -706,6 +921,74 @@ export default function App() {
                   </p>
                 </div>
               </div>
+
+              <p className="form-section-label">Documents (TOR, Passport, HKID)</p>
+              <section className="applicant-documents applicant-documents-form">
+                {documentDefinitions.map(({ type, label }) => {
+                  const serverEntry = editingApplicant?.documents?.[type];
+                  const pendingEntry = pendingDocuments[type];
+                  const isUploaded = Boolean(serverEntry?.uploaded || pendingEntry);
+                  const uploadKey = editingApplicant ? `${editingApplicant.id}-${type}` : `new-${type}`;
+                  const isUploading = uploadingDocumentKey === uploadKey;
+                  const statusLabel = isUploading
+                    ? 'Working...'
+                    : serverEntry?.uploaded
+                      ? 'Uploaded'
+                      : pendingEntry
+                        ? 'Ready to upload'
+                        : 'Not uploaded';
+
+                  return (
+                    <div className="document-row" key={type}>
+                      <div className="document-row-info">
+                        <span className="document-label">{label}</span>
+                        <span className={`document-status ${isUploaded ? 'uploaded' : 'missing'}`}>{statusLabel}</span>
+                        {(serverEntry?.originalName || pendingEntry?.originalName) && (
+                          <span className="document-meta">
+                            {serverEntry?.originalName || pendingEntry?.originalName}
+                          </span>
+                        )}
+                      </div>
+                      <div className="document-row-actions">
+                        <label htmlFor={`form-doc-${type}-${editingApplicant?.id || 'new'}`} className="photo-upload-label">
+                          {isUploaded ? 'Replace' : 'Upload'}
+                        </label>
+                        <input
+                          id={`form-doc-${type}-${editingApplicant?.id || 'new'}`}
+                          type="file"
+                          accept="application/pdf,image/jpeg,image/png,image/webp"
+                          className="photo-input"
+                          disabled={isUploading || isSavingApplicant}
+                          onChange={(event) => handleFormDocumentUpload(type, event)}
+                        />
+                        {isUploaded && (
+                          <>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              disabled={isUploading || isSavingApplicant}
+                              onClick={() => handleFormDocumentView(type)}
+                            >
+                              View
+                            </button>
+                            <button
+                              type="button"
+                              className="danger-button"
+                              disabled={isUploading || isSavingApplicant}
+                              onClick={() => handleFormDocumentDelete(type)}
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                <p className="optional-hint">
+                  PDF, JPG, PNG, or WEBP, up to 10 MB each. Upload anytime; new applicants upload documents when you save.
+                </p>
+              </section>
 
               <p className="form-section-label">Personal Information</p>
               <div className="form-grid">
@@ -1019,7 +1302,7 @@ export default function App() {
                 <p className="empty-state">
                   {hasApplicantSearch
                     ? 'No matching applicants found.'
-                    : 'No applicants saved yet.'}
+                    : 'Enter a name, passport, email, or phone to search applicants.'}
                 </p>
               ) : (
                 <div className="applicant-cards">
@@ -1068,6 +1351,44 @@ export default function App() {
                           </p>
                         );
                       })}
+                      {documentDefinitions.some(({ type }) => applicant.documents?.[type]?.uploaded) && (
+                        <section className="applicant-documents">
+                          {documentDefinitions.map(({ type, label }) => {
+                            const documentEntry = applicant.documents?.[type];
+                            if (!documentEntry?.uploaded) {
+                              return null;
+                            }
+
+                            return (
+                              <div className="document-row" key={type}>
+                                <div className="document-row-info">
+                                  <span className="document-label">{label}</span>
+                                  <span className="document-status uploaded">Uploaded</span>
+                                  <span className="document-meta">{documentEntry.originalName}</span>
+                                </div>
+                                <div className="document-row-actions">
+                                  <button
+                                    type="button"
+                                    className="secondary-button"
+                                    disabled={uploadingDocumentKey === `${applicant.id}-${type}` || isSavingApplicant}
+                                    onClick={() => handleViewDocument(applicant, type)}
+                                  >
+                                    View
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="danger-button"
+                                    disabled={uploadingDocumentKey === `${applicant.id}-${type}` || isSavingApplicant}
+                                    onClick={() => handleDeleteDocument(applicant, type)}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </section>
+                      )}
                       <div className="applicant-card-actions">
                         <button
                           type="button"

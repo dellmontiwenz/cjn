@@ -1,5 +1,17 @@
 import mongoose from 'mongoose';
 
+const uploadedDocumentSchema = new mongoose.Schema(
+  {
+    originalName: { type: String, default: '' },
+    storedName: { type: String, default: '' },
+    cloudPath: { type: String, default: '' },
+    mimeType: { type: String, default: '' },
+    size: { type: Number, default: 0 },
+    uploadedAt: { type: String, default: '' },
+  },
+  { _id: false },
+);
+
 const applicantSchema = new mongoose.Schema(
   {
     firstName: {
@@ -131,6 +143,11 @@ const applicantSchema = new mongoose.Schema(
     photo: {
       type: String,
       default: '',
+    },
+    documents: {
+      tor: { type: uploadedDocumentSchema, default: null },
+      passport: { type: uploadedDocumentSchema, default: null },
+      hkid: { type: uploadedDocumentSchema, default: null },
     },
     createdBy: {
       type: String,

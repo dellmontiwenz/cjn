@@ -1,6 +1,7 @@
 import express from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { Applicant } from '../models/Applicant.js';
+import { registerApplicantDocumentRoutes, serializeDocuments } from './applicantDocuments.js';
 
 const requiredFields = [
   'firstName',
@@ -130,11 +131,12 @@ function serializeApplicant(applicant) {
     dVisaBookingAppointment: applicant.dVisaBookingAppointment || '',
     notes: applicant.notes || '',
     photo: applicant.photo || '',
+    documents: serializeDocuments(applicant.documents),
     createdBy: applicant.createdBy,
   };
 }
 
-export function createApplicantsRouter(applicantModel = Applicant) {
+export function createApplicantsRouter(applicantModel = Applicant, documentStorage = null) {
   const applicantsRouter = express.Router();
 
   applicantsRouter.use(requireAuth);
@@ -223,6 +225,8 @@ export function createApplicantsRouter(applicantModel = Applicant) {
       return next(error);
     }
   });
+
+  registerApplicantDocumentRoutes(applicantsRouter, applicantModel, documentStorage);
 
   return applicantsRouter;
 }
