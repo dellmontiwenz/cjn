@@ -100,6 +100,7 @@ function cleanApplicant(body, userId) {
     signatureAuthenticationAppointment: String(body.signatureAuthenticationAppointment || '').trim(),
     dVisaBookingAppointment: String(body.dVisaBookingAppointment || '').trim(),
     notes: String(body.notes || '').trim(),
+    photo: String(body.photo || '').trim(),
     createdBy: userId,
   };
 }
@@ -132,6 +133,7 @@ function serializeApplicant(applicant) {
     signatureAuthenticationAppointment: applicant.signatureAuthenticationAppointment || '',
     dVisaBookingAppointment: applicant.dVisaBookingAppointment || '',
     notes: applicant.notes || '',
+    photo: applicant.photo || '',
     createdBy: applicant.createdBy,
   };
 }

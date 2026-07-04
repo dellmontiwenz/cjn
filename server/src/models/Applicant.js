@@ -128,6 +128,10 @@ const applicantSchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    photo: {
+      type: String,
+      default: '',
+    },
     createdBy: {
       type: String,
       required: true,

@@ -6,8 +6,24 @@ import { createAuthRouter } from './routes/auth.js';
 export function createApp({ userModel, applicantModel } = {}) {
   const app = express();
 
-  app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
-  app.use(express.json());
+  const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  app.use(
+    cors({
+      origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(new Error(`Origin ${origin} is not allowed by CORS`));
+      },
+    }),
+  );
+  app.use(express.json({ limit: '8mb' }));
 
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });

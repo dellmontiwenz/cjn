@@ -296,6 +296,51 @@ test('stores notes for an applicant', async () => {
   );
 });
 
+test('stores an uploaded photo for an applicant', async () => {
+  const token = await registerAndLogin();
+
+  const photoDataUrl = 'data:image/png;base64,aGVsbG8=';
+
+  const response = await request(app)
+    .post('/api/applicants')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      firstName: 'Maria',
+      lastName: 'Reyes',
+      dateOfBirth: '1997-05-20',
+      sex: 'Female',
+      phoneNumber: '9171234567',
+      emailAddress: 'maria@example.com',
+      passportNumber: 'P1234567',
+      education: 'Bachelor of Science in Nursing',
+      photo: photoDataUrl,
+    });
+
+  expect(response.status).toBe(201);
+  expect(response.body.applicant.photo).toBe(photoDataUrl);
+});
+
+test('returns an empty photo when none is uploaded', async () => {
+  const token = await registerAndLogin();
+
+  const response = await request(app)
+    .post('/api/applicants')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      firstName: 'Anna',
+      lastName: 'Wong',
+      dateOfBirth: '1995-03-10',
+      sex: 'Female',
+      phoneNumber: '98765432',
+      emailAddress: 'anna@example.com',
+      passportNumber: 'HK998877',
+      education: 'Bachelor of Arts',
+    });
+
+  expect(response.status).toBe(201);
+  expect(response.body.applicant.photo).toBe('');
+});
+
 test('rejects a duplicate applicant with the same full name and email', async () => {
   const token = await registerAndLogin();
 

@@ -34,6 +34,18 @@ const countryCodes = [
   { code: '+7', label: '+7 Russia' },
 ];
 
+const defaultApplicantPhoto =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">' +
+      '<rect width="160" height="160" fill="#e5e7eb"/>' +
+      '<circle cx="80" cy="62" r="30" fill="#9ca3af"/>' +
+      '<path d="M30 141c0-27 22-45 50-45s50 18 50 45z" fill="#9ca3af"/>' +
+      '</svg>',
+  );
+
+const maxPhotoBytes = 2 * 1024 * 1024;
+
 const emptyApplicant = {
   firstName: '',
   middleName: '',
@@ -60,6 +72,7 @@ const emptyApplicant = {
   signatureAuthenticationAppointment: '',
   dVisaBookingAppointment: '',
   notes: '',
+  photo: '',
 };
 
 const applicantSearchFields = [
@@ -219,6 +232,7 @@ function applicantToForm(applicant) {
     signatureAuthenticationAppointment: applicant.signatureAuthenticationAppointment || '',
     dVisaBookingAppointment: applicant.dVisaBookingAppointment || '',
     notes: applicant.notes || '',
+    photo: applicant.photo || '',
   };
 }
 
@@ -398,6 +412,39 @@ export default function App() {
     }));
   }
 
+  function handlePhotoChange(event) {
+    const file = event.target.files && event.target.files[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file for the photo.');
+      return;
+    }
+
+    if (file.size > maxPhotoBytes) {
+      setError('Photo must be 2 MB or smaller.');
+      return;
+    }
+
+    setError('');
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateApplicantField('photo', String(reader.result || ''));
+    };
+    reader.onerror = () => {
+      setError('Could not read the selected photo. Please try again.');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleRemovePhoto() {
+    updateApplicantField('photo', '');
+  }
+
   function handleLogout() {
     localStorage.removeItem('authToken');
     setUser(null);
@@ -484,6 +531,33 @@ export default function App() {
             {activeTab === 'create' && (
             <form className="applicant-form" onSubmit={handleApplicantSubmit}>
               <h2>{isEditingApplicant ? 'Edit Applicant' : 'Create New Applicant'}</h2>
+
+              <p className="form-section-label">Photo</p>
+              <div className="photo-upload">
+                <img
+                  className="photo-preview"
+                  src={applicantForm.photo || defaultApplicantPhoto}
+                  alt="Applicant photo preview"
+                />
+                <div className="photo-upload-controls">
+                  <label htmlFor="photo" className="photo-upload-label">
+                    {applicantForm.photo ? 'Change photo' : 'Upload photo'}
+                  </label>
+                  <input
+                    id="photo"
+                    type="file"
+                    accept="image/*"
+                    className="photo-input"
+                    onChange={handlePhotoChange}
+                  />
+                  {applicantForm.photo && (
+                    <button type="button" className="secondary-button" onClick={handleRemovePhoto}>
+                      Remove photo
+                    </button>
+                  )}
+                  <p className="optional-hint">JPG or PNG, up to 2 MB. A default photo is used if none is uploaded.</p>
+                </div>
+              </div>
 
               <p className="form-section-label">Personal Information</p>
               <div className="form-grid">
@@ -801,6 +875,11 @@ export default function App() {
                 <div className="applicant-cards">
                   {displayedApplicants.map((applicant) => (
                     <article className="applicant-card" key={applicant.id}>
+                      <img
+                        className="applicant-photo"
+                        src={applicant.photo || defaultApplicantPhoto}
+                        alt={`${[applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ')} photo`}
+                      />
                       <h3>
                         {[applicant.firstName, applicant.middleName, applicant.lastName].filter(Boolean).join(' ')}
                       </h3>

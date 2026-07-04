@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: cjn-api
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      # Set these two in the Render dashboard (they are secrets):
+      #   MONGODB_URI    -> your MongoDB Atlas connection string
+      #   CLIENT_ORIGIN  -> your Vercel URL, e.g. https://cjn.vercel.app
+      #                     (comma-separate to allow more than one origin)
+      - key: MONGODB_URI
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
