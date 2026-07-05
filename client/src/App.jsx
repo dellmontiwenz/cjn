@@ -6,6 +6,7 @@ import {
   exportApplicantWord,
   getApplicants,
   getCurrentUser,
+  getRegisteredApplicantNames,
   loginUser,
   openApplicantDocument,
   registerUser,
@@ -300,6 +301,8 @@ export default function App() {
   const [uploadingDocumentKey, setUploadingDocumentKey] = useState('');
   const [pendingDocuments, setPendingDocuments] = useState(emptyPendingDocuments);
   const [exportingApplicantId, setExportingApplicantId] = useState('');
+  const [registeredApplicantNames, setRegisteredApplicantNames] = useState([]);
+  const [isLoadingRegisteredNames, setIsLoadingRegisteredNames] = useState(false);
   const [isRestoringSession, setIsRestoringSession] = useState(() => Boolean(localStorage.getItem('authToken')));
   const inactivityTimerRef = useRef(null);
 
@@ -325,6 +328,7 @@ export default function App() {
     setUser(null);
     setToken('');
     setApplicants([]);
+    setRegisteredApplicantNames([]);
     setApplicantSearch('');
     setLastSavedApplicantId('');
     setEditingApplicantId('');
@@ -393,6 +397,41 @@ export default function App() {
       });
     };
   }, [user, handleLogout]);
+
+  useEffect(() => {
+    if (!user?.isAdmin || activeTab !== 'registered' || !token) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+
+    async function loadRegisteredNames() {
+      setIsLoadingRegisteredNames(true);
+      setError('');
+
+      try {
+        const data = await getRegisteredApplicantNames(token);
+        if (!isCancelled) {
+          setRegisteredApplicantNames(data.applicants);
+        }
+      } catch (loadError) {
+        if (!isCancelled) {
+          setError(loadError.message);
+          setRegisteredApplicantNames([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingRegisteredNames(false);
+        }
+      }
+    }
+
+    loadRegisteredNames();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user, activeTab, token]);
 
   const isLogin = mode === 'login';
   const isEditingApplicant = Boolean(editingApplicantId);
@@ -872,6 +911,15 @@ export default function App() {
             >
               Search Applicants
             </button>
+            {user.isAdmin && (
+              <button
+                type="button"
+                className={activeTab === 'registered' ? 'tab-button active' : 'tab-button'}
+                onClick={() => setActiveTab('registered')}
+              >
+                Registered Applicants
+              </button>
+            )}
           </div>
 
           <div className="applicant-search dashboard-search">
@@ -1312,6 +1360,27 @@ export default function App() {
                 </button>
               </div>
             </form>
+            )}
+
+            {activeTab === 'registered' && user.isAdmin && (
+            <section className="applicant-list registered-applicant-list" aria-label="Registered applicants">
+              <h2>Registered Applicants</h2>
+              <p className="registered-applicant-hint">
+                Complete names only, sorted by surname. Format: Surname, First name Middle name.
+              </p>
+              {error && <p className="form-error">{error}</p>}
+              {isLoadingRegisteredNames ? (
+                <p className="empty-state">Loading registered applicants...</p>
+              ) : registeredApplicantNames.length === 0 ? (
+                <p className="empty-state">No applicants registered yet.</p>
+              ) : (
+                <ol className="registered-applicant-names">
+                  {registeredApplicantNames.map((entry) => (
+                    <li key={entry.id}>{entry.registeredName}</li>
+                  ))}
+                </ol>
+              )}
+            </section>
             )}
 
             {activeTab === 'search' && (

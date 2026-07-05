@@ -250,6 +250,25 @@ button:disabled {
   padding: 1.5rem;
 }
 
+.registered-applicant-hint {
+  color: #6b7280;
+  margin: 0 0 1rem;
+}
+
+.registered-applicant-names {
+  display: grid;
+  gap: 0.65rem;
+  list-style: decimal;
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.registered-applicant-names li {
+  color: #1f2937;
+  font-size: 1rem;
+  padding: 0.15rem 0;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

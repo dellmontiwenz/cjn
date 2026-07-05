@@ -79,6 +79,14 @@ export function getApplicants(token) {
   });
 }
 
+export function getRegisteredApplicantNames(token) {
+  return request('/api/applicants/names', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export function createApplicant(token, applicant) {
   return request('/api/applicants', {
     method: 'POST',

@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAdmin, requireAuth } from '../middleware/auth.js';
 import { Applicant } from '../models/Applicant.js';
 import { registerApplicantDocumentRoutes, serializeDocuments } from './applicantDocuments.js';
 
@@ -23,6 +23,33 @@ function applicantFullName(applicant) {
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+}
+
+export function formatRegisteredApplicantName(applicant) {
+  const lastName = String(applicant.lastName || '').trim();
+  const firstName = String(applicant.firstName || '').trim();
+  const middleName = String(applicant.middleName || '').trim();
+  const givenNames = [firstName, middleName].filter(Boolean).join(' ');
+
+  if (!lastName) {
+    return givenNames;
+  }
+
+  return givenNames ? `${lastName}, ${givenNames}` : lastName;
+}
+
+function compareRegisteredNames(left, right) {
+  const lastNameCompare = left.lastName.localeCompare(right.lastName, undefined, { sensitivity: 'base' });
+  if (lastNameCompare !== 0) {
+    return lastNameCompare;
+  }
+
+  const firstNameCompare = left.firstName.localeCompare(right.firstName, undefined, { sensitivity: 'base' });
+  if (firstNameCompare !== 0) {
+    return firstNameCompare;
+  }
+
+  return left.middleName.localeCompare(right.middleName, undefined, { sensitivity: 'base' });
 }
 
 function normalizeEmail(email) {
@@ -168,6 +195,25 @@ export function createApplicantsRouter(applicantModel = Applicant, documentStora
       const applicants = await applicantModel.find({}).sort({ createdAt: -1 });
 
       return res.json({ applicants: applicants.map(serializeApplicant) });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  applicantsRouter.get('/names', requireAdmin, async (req, res, next) => {
+    try {
+      const applicants = await applicantModel.find({}).sort({ createdAt: -1 });
+      const names = applicants
+        .map((applicant) => ({
+          id: applicant._id.toString(),
+          lastName: applicant.lastName || '',
+          firstName: applicant.firstName || '',
+          middleName: applicant.middleName || '',
+          registeredName: formatRegisteredApplicantName(applicant),
+        }))
+        .sort(compareRegisteredNames);
+
+      return res.json({ applicants: names });
     } catch (error) {
       return next(error);
     }

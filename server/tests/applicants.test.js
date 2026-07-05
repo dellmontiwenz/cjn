@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { createApp } from '../src/app.js';
+import { formatRegisteredApplicantName } from '../src/routes/applicants.js';
 
 let User;
 let Applicant;
@@ -522,4 +523,85 @@ test('updates an applicant saved by the logged-in user', async () => {
 
   expect(listResponse.body.applicants[0].currentLocation).toBe('Singapore');
   expect(listResponse.body.applicants[0].profession).toBe('ICU Nurse');
+});
+
+test('formats registered applicant names as surname, first name, and middle name', () => {
+  expect(
+    formatRegisteredApplicantName({
+      firstName: 'Maria',
+      middleName: 'Santos',
+      lastName: 'Reyes',
+    }),
+  ).toBe('Reyes, Maria Santos');
+
+  expect(
+    formatRegisteredApplicantName({
+      firstName: 'Anna',
+      middleName: '',
+      lastName: 'Wong',
+    }),
+  ).toBe('Wong, Anna');
+});
+
+test('returns registered applicant names for admins only', async () => {
+  const adminToken = await registerAndLogin('dellmonti1106');
+  const staffToken = await registerAndLogin('staffuser');
+
+  await request(app)
+    .post('/api/applicants')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .send({
+      firstName: 'Maria',
+      middleName: 'Santos',
+      lastName: 'Reyes',
+      dateOfBirth: '1997-05-20',
+      sex: 'Female',
+      phoneNumber: '9171234567',
+      emailAddress: 'maria@example.com',
+      passportNumber: 'P1234567',
+      education: 'Bachelor of Science in Nursing',
+    });
+
+  await request(app)
+    .post('/api/applicants')
+    .set('Authorization', `Bearer ${adminToken}`)
+    .send({
+      firstName: 'Anna',
+      lastName: 'Wong',
+      dateOfBirth: '1995-03-10',
+      sex: 'Female',
+      phoneNumber: '98765432',
+      emailAddress: 'anna@example.com',
+      passportNumber: 'HK998877',
+      education: 'Bachelor of Arts',
+    });
+
+  const forbiddenResponse = await request(app)
+    .get('/api/applicants/names')
+    .set('Authorization', `Bearer ${staffToken}`);
+
+  expect(forbiddenResponse.status).toBe(403);
+  expect(forbiddenResponse.body.message).toBe('Admin access required');
+
+  const response = await request(app)
+    .get('/api/applicants/names')
+    .set('Authorization', `Bearer ${adminToken}`);
+
+  expect(response.status).toBe(200);
+  expect(response.body.applicants).toEqual([
+    {
+      id: '1',
+      lastName: 'Reyes',
+      firstName: 'Maria',
+      middleName: 'Santos',
+      registeredName: 'Reyes, Maria Santos',
+    },
+    {
+      id: '2',
+      lastName: 'Wong',
+      firstName: 'Anna',
+      middleName: '',
+      registeredName: 'Wong, Anna',
+    },
+  ]);
 });
