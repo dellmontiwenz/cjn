@@ -56,19 +56,20 @@ function createMemoryApplicantModel() {
       const [deletedApplicant] = applicants.splice(index, 1);
       return deletedApplicant;
     },
-    async findOneAndUpdate({ _id }, data) {
+    async findOneAndUpdate({ _id }, data, options = {}) {
       const index = applicants.findIndex((applicant) => applicant._id.toString() === _id);
 
       if (index === -1) {
         return null;
       }
 
+      const previousApplicant = { ...applicants[index] };
       applicants[index] = {
         ...applicants[index],
         ...data,
       };
 
-      return applicants[index];
+      return options.new ? applicants[index] : previousApplicant;
     },
   };
 }

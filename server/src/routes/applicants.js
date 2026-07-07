@@ -244,6 +244,7 @@ export function createApplicantsRouter(applicantModel = Applicant, documentStora
           ...applicantData,
           createdBy: currentApplicant.createdBy,
         },
+        { new: true },
       );
 
       if (!updatedApplicant) {
