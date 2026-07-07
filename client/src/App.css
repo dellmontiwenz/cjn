@@ -226,12 +226,18 @@ button:disabled {
 .tab-button {
   background: #ede9fe;
   color: #5b21b6;
+  flex: 1 1 12rem;
   margin: 0;
+  min-width: 0;
 }
 
 .tab-button.active {
   background: #6d28d9;
   color: #fff;
+}
+
+.tab-label-short {
+  display: none;
 }
 
 .dashboard-search {
@@ -609,5 +615,34 @@ h2 {
 
   .applicant-search-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-shell {
+    padding: 1rem;
+  }
+
+  .dashboard-panel {
+    border-radius: 22px;
+    padding: 1.25rem;
+  }
+
+  .dashboard-tabs {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: 1fr;
+  }
+
+  .tab-button {
+    width: 100%;
+  }
+
+  .tab-label-long {
+    display: none;
+  }
+
+  .tab-label-short {
+    display: inline;
   }
 }

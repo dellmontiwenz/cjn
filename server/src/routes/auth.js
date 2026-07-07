@@ -85,10 +85,20 @@ export function createAuthRouter(userModel = User) {
     }
   });
 
-  authRouter.get('/me', requireAuth, (req, res) => {
-    return res.json({
-      user: serializeUser(req.user),
-    });
+  authRouter.get('/me', requireAuth, async (req, res, next) => {
+    try {
+      const user = await userModel.findOne({ _id: req.user.id });
+
+      if (!user) {
+        return res.status(401).json({ message: 'Invalid authorization token' });
+      }
+
+      return res.json({
+        user: serializeUser(user),
+      });
+    } catch (error) {
+      return next(error);
+    }
   });
 
   return authRouter;

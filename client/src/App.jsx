@@ -902,14 +902,16 @@ export default function App() {
               className={activeTab === 'create' ? 'tab-button active' : 'tab-button'}
               onClick={() => setActiveTab('create')}
             >
-              {isEditingApplicant ? 'Edit Applicant' : 'Create New Applicant'}
+              <span className="tab-label-long">{isEditingApplicant ? 'Edit Applicant' : 'Create New Applicant'}</span>
+              <span className="tab-label-short">{isEditingApplicant ? 'Edit' : 'Create'}</span>
             </button>
             <button
               type="button"
               className={activeTab === 'search' ? 'tab-button active' : 'tab-button'}
               onClick={() => setActiveTab('search')}
             >
-              Search Applicants
+              <span className="tab-label-long">Search Applicants</span>
+              <span className="tab-label-short">Search</span>
             </button>
             {user.isAdmin && (
               <button
@@ -917,7 +919,8 @@ export default function App() {
                 className={activeTab === 'registered' ? 'tab-button active' : 'tab-button'}
                 onClick={() => setActiveTab('registered')}
               >
-                Registered Applicants
+                <span className="tab-label-long">Registered Applicants</span>
+                <span className="tab-label-short">Registered</span>
               </button>
             )}
           </div>

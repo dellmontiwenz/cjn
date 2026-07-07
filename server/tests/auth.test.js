@@ -13,8 +13,17 @@ function createMemoryUserModel() {
     async deleteMany() {
       users.length = 0;
     },
-    async findOne({ username }) {
-      return users.find((user) => user.username === username) || null;
+    async findOne(query) {
+      if (query.username) {
+        return users.find((user) => user.username === query.username) || null;
+      }
+
+      if (query._id) {
+        const targetId = typeof query._id === 'string' ? query._id : query._id.toString();
+        return users.find((user) => user._id.toString() === targetId) || null;
+      }
+
+      return null;
     },
     async create(data) {
       const user = {
@@ -138,6 +147,23 @@ test('returns the current user with a valid token', async () => {
 
   expect(response.status).toBe(200);
   expect(response.body.user.username).toBe('wendell');
+  expect(response.body.user.isAdmin).toBe(false);
+});
+
+test('returns admin status from the database on session restore', async () => {
+  await registerUser('dellmonti1106', 'password123');
+
+  const login = await request(app)
+    .post('/api/auth/login')
+    .send({ username: 'dellmonti1106', password: 'password123' });
+
+  const response = await request(app)
+    .get('/api/auth/me')
+    .set('Authorization', `Bearer ${login.body.token}`);
+
+  expect(response.status).toBe(200);
+  expect(response.body.user.username).toBe('dellmonti1106');
+  expect(response.body.user.isAdmin).toBe(true);
 });
 
 test('rejects current user requests without a token', async () => {
