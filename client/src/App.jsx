@@ -1,16 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  addApplicantPaymentEntry,
+  clearApplicantPaymentHistory,
   createApplicant,
   deleteApplicant,
   deleteApplicantDocument,
+  deleteApplicantPaymentEntry,
+  exportApplicantPaymentsWord,
   exportApplicantWord,
   getApplicants,
+  getApplicantPayments,
   getCurrentUser,
   getRegisteredApplicantNames,
   loginUser,
   openApplicantDocument,
   registerUser,
   updateApplicant,
+  updateApplicantTotalFees,
   uploadApplicantDocument,
 } from './api.js';
 import PageBackground from './PageBackground.jsx';
@@ -149,6 +155,40 @@ const applicantSearchFields = [
 ];
 
 const duplicateApplicantMessage = 'An applicant with the same full name and email already exists.';
+
+const emptyPaymentDetails = {
+  totalFees: 0,
+  totalPaid: 0,
+  balance: 0,
+  entries: [],
+};
+
+function formatMoney(amount) {
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 2,
+  }).format(Number(amount) || 0);
+}
+
+function formatPaymentDate(paidAt) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(paidAt);
+  if (!match) {
+    return paidAt;
+  }
+
+  const [, year, month, day] = match;
+  const localDate = new Date(Number(year), Number(month) - 1, Number(day));
+  if (Number.isNaN(localDate.getTime())) {
+    return paidAt;
+  }
+
+  return localDate.toLocaleDateString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
 function applicantFullName(applicant) {
   return [applicant.firstName, applicant.middleName, applicant.lastName]
@@ -303,6 +343,17 @@ export default function App() {
   const [exportingApplicantId, setExportingApplicantId] = useState('');
   const [registeredApplicantNames, setRegisteredApplicantNames] = useState([]);
   const [isLoadingRegisteredNames, setIsLoadingRegisteredNames] = useState(false);
+  const [paymentApplicantId, setPaymentApplicantId] = useState('');
+  const [paymentDetails, setPaymentDetails] = useState(emptyPaymentDetails);
+  const [paymentTotalFeesInput, setPaymentTotalFeesInput] = useState('');
+  const [paymentDateInput, setPaymentDateInput] = useState('');
+  const [paymentAmountInput, setPaymentAmountInput] = useState('');
+  const [isLoadingPaymentDetails, setIsLoadingPaymentDetails] = useState(false);
+  const [isSavingPaymentDetails, setIsSavingPaymentDetails] = useState(false);
+  const [isExportingPaymentWord, setIsExportingPaymentWord] = useState(false);
+  const [paymentDeleteAction, setPaymentDeleteAction] = useState('');
+  const [paymentDeleteEntryId, setPaymentDeleteEntryId] = useState('');
+  const [paymentAdminPasswordInput, setPaymentAdminPasswordInput] = useState('');
   const [isRestoringSession, setIsRestoringSession] = useState(() => Boolean(localStorage.getItem('authToken')));
   const inactivityTimerRef = useRef(null);
 
@@ -329,6 +380,14 @@ export default function App() {
     setToken('');
     setApplicants([]);
     setRegisteredApplicantNames([]);
+    setPaymentApplicantId('');
+    setPaymentDetails(emptyPaymentDetails);
+    setPaymentTotalFeesInput('');
+    setPaymentDateInput('');
+    setPaymentAmountInput('');
+    setPaymentDeleteAction('');
+    setPaymentDeleteEntryId('');
+    setPaymentAdminPasswordInput('');
     setApplicantSearch('');
     setLastSavedApplicantId('');
     setEditingApplicantId('');
@@ -433,10 +492,49 @@ export default function App() {
     };
   }, [user, activeTab, token]);
 
+  useEffect(() => {
+    if (activeTab !== 'payments' || !paymentApplicantId || !token) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+
+    async function loadPaymentDetails() {
+      setIsLoadingPaymentDetails(true);
+      setError('');
+
+      try {
+        const data = await getApplicantPayments(token, paymentApplicantId);
+        if (!isCancelled) {
+          setPaymentDetails(data.payment);
+          setPaymentTotalFeesInput(String(data.payment.totalFees ?? 0));
+        }
+      } catch (loadError) {
+        if (!isCancelled) {
+          setError(loadError.message);
+          setPaymentDetails(emptyPaymentDetails);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingPaymentDetails(false);
+        }
+      }
+    }
+
+    loadPaymentDetails();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user, activeTab, paymentApplicantId, token]);
+
   const isLogin = mode === 'login';
   const isEditingApplicant = Boolean(editingApplicantId);
   const editingApplicant = isEditingApplicant
     ? applicants.find((applicant) => applicant.id === editingApplicantId)
+    : null;
+  const paymentApplicant = paymentApplicantId
+    ? applicants.find((applicant) => applicant.id === paymentApplicantId)
     : null;
   const hasApplicantSearch = applicantSearch.trim().length > 0;
   const displayedApplicants = applicants.filter((applicant) => {
@@ -496,6 +594,174 @@ export default function App() {
       setError(submitError.message);
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  function updateApplicantPayment(applicantId, payment) {
+    setApplicants((currentApplicants) =>
+      currentApplicants.map((currentApplicant) =>
+        currentApplicant.id === applicantId
+          ? { ...currentApplicant, payment }
+          : currentApplicant,
+      ),
+    );
+    setPaymentDetails(payment);
+    setPaymentTotalFeesInput(String(payment.totalFees ?? 0));
+  }
+
+  function handleOpenPaymentDetails(applicant) {
+    setError('');
+    setMessage('');
+    setPaymentApplicantId(applicant.id);
+    setPaymentDateInput('');
+    setPaymentAmountInput('');
+    setPaymentDeleteAction('');
+    setPaymentDeleteEntryId('');
+    setPaymentAdminPasswordInput('');
+    setActiveTab('payments');
+  }
+
+  function handleBackFromPayments() {
+    setPaymentApplicantId('');
+    setPaymentDetails(emptyPaymentDetails);
+    setPaymentTotalFeesInput('');
+    setPaymentDateInput('');
+    setPaymentAmountInput('');
+    setPaymentDeleteAction('');
+    setPaymentDeleteEntryId('');
+    setPaymentAdminPasswordInput('');
+    setActiveTab('search');
+  }
+
+  function cancelPaymentDeleteAction() {
+    setPaymentDeleteAction('');
+    setPaymentDeleteEntryId('');
+    setPaymentAdminPasswordInput('');
+    setError('');
+  }
+
+  function requestDeletePaymentEntry(entryId) {
+    setError('');
+    setMessage('');
+    setPaymentDeleteAction('entry');
+    setPaymentDeleteEntryId(entryId);
+    setPaymentAdminPasswordInput('');
+  }
+
+  function requestClearPaymentHistory() {
+    if (paymentDetails.entries.length === 0) {
+      return;
+    }
+
+    setError('');
+    setMessage('');
+    setPaymentDeleteAction('history');
+    setPaymentDeleteEntryId('');
+    setPaymentAdminPasswordInput('');
+  }
+
+  async function confirmPaymentDeleteAction() {
+    if (!paymentApplicantId || !paymentDeleteAction) {
+      return;
+    }
+
+    if (!paymentAdminPasswordInput) {
+      setError('Administration password is required');
+      return;
+    }
+
+    setError('');
+    setMessage('');
+    setIsSavingPaymentDetails(true);
+
+    try {
+      const data =
+        paymentDeleteAction === 'history'
+          ? await clearApplicantPaymentHistory(token, paymentApplicantId, paymentAdminPasswordInput)
+          : await deleteApplicantPaymentEntry(
+              token,
+              paymentApplicantId,
+              paymentDeleteEntryId,
+              paymentAdminPasswordInput,
+            );
+
+      updateApplicantPayment(paymentApplicantId, data.payment);
+      setMessage(paymentDeleteAction === 'history' ? 'Payment details cleared.' : 'Payment entry deleted.');
+      cancelPaymentDeleteAction();
+    } catch (deleteError) {
+      setError(deleteError.message);
+    } finally {
+      setIsSavingPaymentDetails(false);
+    }
+  }
+
+  async function handleSaveTotalFees(event) {
+    event.preventDefault();
+    if (!paymentApplicantId) {
+      return;
+    }
+
+    setError('');
+    setMessage('');
+    setIsSavingPaymentDetails(true);
+
+    try {
+      const data = await updateApplicantTotalFees(token, paymentApplicantId, Number(paymentTotalFeesInput));
+      updateApplicantPayment(paymentApplicantId, data.payment);
+      setMessage('Total fees saved.');
+    } catch (saveError) {
+      setError(saveError.message);
+    } finally {
+      setIsSavingPaymentDetails(false);
+    }
+  }
+
+  async function handleAddPaymentEntry(event) {
+    event.preventDefault();
+    if (!paymentApplicantId) {
+      return;
+    }
+
+    setError('');
+    setMessage('');
+    setIsSavingPaymentDetails(true);
+
+    try {
+      const data = await addApplicantPaymentEntry(token, paymentApplicantId, {
+        paidAt: paymentDateInput,
+        amount: Number(paymentAmountInput),
+      });
+      updateApplicantPayment(paymentApplicantId, data.payment);
+      setPaymentDateInput('');
+      setPaymentAmountInput('');
+      setMessage('Payment recorded.');
+    } catch (saveError) {
+      setError(saveError.message);
+    } finally {
+      setIsSavingPaymentDetails(false);
+    }
+  }
+
+  async function handleExportPaymentWord() {
+    if (!paymentApplicantId) {
+      return;
+    }
+
+    setError('');
+    setMessage('');
+    setIsExportingPaymentWord(true);
+
+    try {
+      const data = await exportApplicantPaymentsWord(token, paymentApplicantId);
+      setMessage(
+        data.savedPath
+          ? `Payment Word file downloaded and saved to cjn/${data.savedPath}.`
+          : `Payment Word file downloaded (${data.fileName}).`,
+      );
+    } catch (exportError) {
+      setError(exportError.message);
+    } finally {
+      setIsExportingPaymentWord(false);
     }
   }
 
@@ -1386,6 +1652,185 @@ export default function App() {
             </section>
             )}
 
+            {activeTab === 'payments' && paymentApplicant && (
+            <section className="applicant-list payment-details-page" aria-label="Applicant payment details">
+              <div className="payment-page-header">
+                <button type="button" className="secondary-button payment-back-button" onClick={handleBackFromPayments}>
+                  Back to Search
+                </button>
+                <div>
+                  <h2>Payment Details</h2>
+                  <p className="payment-applicant-name">
+                    {[paymentApplicant.firstName, paymentApplicant.middleName, paymentApplicant.lastName]
+                      .filter(Boolean)
+                      .join(' ')}
+                  </p>
+                </div>
+                <div className="payment-page-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={isExportingPaymentWord || isSavingPaymentDetails}
+                    onClick={handleExportPaymentWord}
+                  >
+                    {isExportingPaymentWord ? 'Exporting...' : 'Export to Word'}
+                  </button>
+                </div>
+              </div>
+
+              {error && <p className="form-error">{error}</p>}
+              {message && <p className="form-success">{message}</p>}
+
+              {isLoadingPaymentDetails ? (
+                <p className="empty-state">Loading payment details...</p>
+              ) : (
+                <>
+                  <div className="payment-summary-grid">
+                    <article className="payment-summary-card">
+                      <span className="payment-summary-label">Total Fees</span>
+                      <strong>{formatMoney(paymentDetails.totalFees)}</strong>
+                    </article>
+                    <article className="payment-summary-card">
+                      <span className="payment-summary-label">Total Payment</span>
+                      <strong>{formatMoney(paymentDetails.totalPaid)}</strong>
+                    </article>
+                    <article className="payment-summary-card payment-summary-balance">
+                      <span className="payment-summary-label">Balance</span>
+                      <strong>{formatMoney(paymentDetails.balance)}</strong>
+                    </article>
+                  </div>
+
+                  <form className="payment-form" onSubmit={handleSaveTotalFees}>
+                    <p className="form-section-label">Total Fees</p>
+                    <div className="payment-form-row">
+                      <div className="form-field">
+                        <label htmlFor="paymentTotalFees">Amount</label>
+                        <input
+                          id="paymentTotalFees"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={paymentTotalFeesInput}
+                          disabled={isSavingPaymentDetails}
+                          onChange={(event) => setPaymentTotalFeesInput(event.target.value)}
+                        />
+                      </div>
+                      <button type="submit" disabled={isSavingPaymentDetails}>
+                        {isSavingPaymentDetails ? 'Saving...' : 'Save Total Fees'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <form className="payment-form" onSubmit={handleAddPaymentEntry}>
+                    <p className="form-section-label">Record Payment</p>
+                    <div className="payment-entry-grid">
+                      <div className="form-field">
+                        <label htmlFor="paymentDate">Payment date</label>
+                        <input
+                          id="paymentDate"
+                          type="date"
+                          value={paymentDateInput}
+                          disabled={isSavingPaymentDetails}
+                          onChange={(event) => setPaymentDateInput(event.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="form-field">
+                        <label htmlFor="paymentAmount">Paid amount</label>
+                        <input
+                          id="paymentAmount"
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={paymentAmountInput}
+                          disabled={isSavingPaymentDetails}
+                          onChange={(event) => setPaymentAmountInput(event.target.value)}
+                          required
+                        />
+                      </div>
+                      <button type="submit" disabled={isSavingPaymentDetails}>
+                        {isSavingPaymentDetails ? 'Saving...' : 'Add Payment'}
+                      </button>
+                    </div>
+                  </form>
+
+                  <section className="payment-entries-section">
+                    <div className="payment-entries-header">
+                      <h3>Payment History</h3>
+                      <button
+                        type="button"
+                        className="danger-button"
+                        disabled={isSavingPaymentDetails || paymentDetails.entries.length === 0}
+                        onClick={requestClearPaymentHistory}
+                      >
+                        Clear Payment Details
+                      </button>
+                    </div>
+
+                    {paymentDeleteAction && (
+                      <div className="payment-admin-confirm">
+                        <p className="payment-admin-confirm-text">
+                          {paymentDeleteAction === 'history'
+                            ? 'Enter the administration password to clear all payment details, including total fees, payment history, and balance.'
+                            : 'Enter the administration password to delete this payment entry.'}
+                        </p>
+                        <label htmlFor="paymentAdminPassword">Administration password</label>
+                        <input
+                          id="paymentAdminPassword"
+                          type="password"
+                          value={paymentAdminPasswordInput}
+                          disabled={isSavingPaymentDetails}
+                          onChange={(event) => setPaymentAdminPasswordInput(event.target.value)}
+                          placeholder="Enter administration password"
+                        />
+                        <div className="payment-admin-confirm-actions">
+                          <button
+                            type="button"
+                            className="danger-button"
+                            disabled={isSavingPaymentDetails}
+                            onClick={confirmPaymentDeleteAction}
+                          >
+                            {isSavingPaymentDetails ? 'Working...' : 'Confirm'}
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            disabled={isSavingPaymentDetails}
+                            onClick={cancelPaymentDeleteAction}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {paymentDetails.entries.length === 0 ? (
+                      <p className="empty-state">No payments recorded yet.</p>
+                    ) : (
+                      <div className="payment-entries-list">
+                        {paymentDetails.entries.map((entry) => (
+                          <article className="payment-entry-row" key={entry.id}>
+                            <div>
+                              <strong>{formatPaymentDate(entry.paidAt)}</strong>
+                              <p>{formatMoney(entry.amount)}</p>
+                            </div>
+                            <button
+                              type="button"
+                              className="danger-button"
+                              disabled={isSavingPaymentDetails || Boolean(paymentDeleteAction)}
+                              onClick={() => requestDeletePaymentEntry(entry.id)}
+                            >
+                              Delete
+                            </button>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </>
+              )}
+            </section>
+            )}
+
             {activeTab === 'search' && (
             <section className="applicant-list" aria-label="Applicant search results">
               <h2>Search Applicants</h2>
@@ -1483,6 +1928,13 @@ export default function App() {
                         </section>
                       )}
                       <div className="applicant-card-actions">
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={() => handleOpenPaymentDetails(applicant)}
+                        >
+                          Payment Details
+                        </button>
                         <button
                           type="button"
                           className="secondary-button"

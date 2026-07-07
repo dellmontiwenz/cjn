@@ -180,6 +180,92 @@ export function deleteApplicantDocument(token, applicantId, documentType) {
   });
 }
 
+export function getApplicantPayments(token, applicantId) {
+  return request(`/api/applicants/${applicantId}/payments`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export function updateApplicantTotalFees(token, applicantId, totalFees) {
+  return request(`/api/applicants/${applicantId}/payments/total-fees`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ totalFees }),
+  });
+}
+
+export function addApplicantPaymentEntry(token, applicantId, paymentEntry) {
+  return request(`/api/applicants/${applicantId}/payments/entries`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(paymentEntry),
+  });
+}
+
+export function deleteApplicantPaymentEntry(token, applicantId, entryId, adminPassword) {
+  return request(`/api/applicants/${applicantId}/payments/entries/${entryId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ adminPassword }),
+  });
+}
+
+export function clearApplicantPaymentHistory(token, applicantId, adminPassword) {
+  return request(`/api/applicants/${applicantId}/payments/history`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ adminPassword }),
+  });
+}
+
+export async function exportApplicantPaymentsWord(token, applicantId) {
+  let response;
+
+  try {
+    response = await fetch(`${API_URL}/api/applicants/${applicantId}/payments/export/word`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch {
+    throw new Error(
+      `Cannot reach the server at ${API_URL}. If you are running locally, start the backend with "npm run dev:server".`,
+    );
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || 'Payment Word export failed');
+  }
+
+  const blob = await response.blob();
+  const savedPath = response.headers.get('X-CJN-Saved-Path') || '';
+  const contentDisposition = response.headers.get('Content-Disposition') || '';
+  const fileName =
+    response.headers.get('X-CJN-Filename')
+    || parseContentDispositionFileName(contentDisposition)
+    || 'payments.docx';
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = fileName;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+
+  return { fileName, savedPath };
+}
+
 export async function exportApplicantWord(token, applicantId) {
   let response;
 

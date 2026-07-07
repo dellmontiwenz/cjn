@@ -8,6 +8,24 @@ export function isAdminUser(user) {
   return user.isAdmin === true || String(user.username || '').trim().toLowerCase() === adminUsername;
 }
 
+export function validateAdministrationPassword(adminPassword) {
+  const expectedPassword = process.env.ADMIN_REGISTRATION_PASSWORD;
+
+  if (!expectedPassword) {
+    return 'Administration password is not configured on the server';
+  }
+
+  if (!adminPassword) {
+    return 'Administration password is required';
+  }
+
+  if (adminPassword !== expectedPassword) {
+    return 'Invalid administration password';
+  }
+
+  return null;
+}
+
 export function validateAdminRegistrationPassword(adminPassword) {
   const expectedPassword = process.env.ADMIN_REGISTRATION_PASSWORD;
 

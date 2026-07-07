@@ -155,7 +155,7 @@ export function registerApplicantDocumentRoutes(applicantsRouter, applicantModel
             [`documents.${req.params.documentType}`]: documentEntry,
           },
         },
-        { new: true },
+        { returnDocument: 'after' },
       );
 
       const documents = serializeDocuments(updatedApplicant?.documents || {
@@ -235,7 +235,7 @@ export function registerApplicantDocumentRoutes(applicantsRouter, applicantModel
             [`documents.${req.params.documentType}`]: '',
           },
         },
-        { new: true },
+        { returnDocument: 'after' },
       );
 
       return res.json({

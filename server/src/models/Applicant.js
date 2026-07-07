@@ -12,6 +12,40 @@ const uploadedDocumentSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const paymentEntrySchema = new mongoose.Schema(
+  {
+    paidAt: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    amount: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    recordedAt: {
+      type: String,
+      default: '',
+    },
+  },
+);
+
+const paymentSchema = new mongoose.Schema(
+  {
+    totalFees: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    entries: {
+      type: [paymentEntrySchema],
+      default: [],
+    },
+  },
+  { _id: false },
+);
+
 const applicantSchema = new mongoose.Schema(
   {
     firstName: {
@@ -148,6 +182,10 @@ const applicantSchema = new mongoose.Schema(
       tor: { type: uploadedDocumentSchema, default: null },
       passport: { type: uploadedDocumentSchema, default: null },
       hkid: { type: uploadedDocumentSchema, default: null },
+    },
+    payment: {
+      type: paymentSchema,
+      default: () => ({ totalFees: 0, entries: [] }),
     },
     createdBy: {
       type: String,

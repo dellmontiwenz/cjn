@@ -2,6 +2,8 @@ import express from 'express';
 import { requireAdmin, requireAuth } from '../middleware/auth.js';
 import { Applicant } from '../models/Applicant.js';
 import { registerApplicantDocumentRoutes, serializeDocuments } from './applicantDocuments.js';
+import { registerApplicantPaymentRoutes } from './applicantPayments.js';
+import { serializePayment } from '../services/applicantPayments.js';
 
 const requiredFields = [
   'firstName',
@@ -159,6 +161,7 @@ function serializeApplicant(applicant) {
     notes: applicant.notes || '',
     photo: applicant.photo || '',
     documents: serializeDocuments(applicant.documents),
+    payment: serializePayment(applicant.payment),
     createdBy: applicant.createdBy,
   };
 }
@@ -244,7 +247,7 @@ export function createApplicantsRouter(applicantModel = Applicant, documentStora
           ...applicantData,
           createdBy: currentApplicant.createdBy,
         },
-        { new: true },
+        { returnDocument: 'after' },
       );
 
       if (!updatedApplicant) {
@@ -274,6 +277,7 @@ export function createApplicantsRouter(applicantModel = Applicant, documentStora
   });
 
   registerApplicantDocumentRoutes(applicantsRouter, applicantModel, documentStorage);
+  registerApplicantPaymentRoutes(applicantsRouter, applicantModel, documentStorage);
 
   return applicantsRouter;
 }

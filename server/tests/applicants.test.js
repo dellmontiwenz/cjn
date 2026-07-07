@@ -69,7 +69,9 @@ function createMemoryApplicantModel() {
         ...data,
       };
 
-      return options.new ? applicants[index] : previousApplicant;
+      return options.returnDocument === 'after' || options.new === true
+        ? applicants[index]
+        : previousApplicant;
     },
   };
 }

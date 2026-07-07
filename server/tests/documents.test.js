@@ -107,7 +107,9 @@ function createMemoryApplicantModel() {
       }
 
       applicants[index] = nextApplicant;
-      return options.new === false ? currentApplicant : nextApplicant;
+      return options.returnDocument === 'after' || options.new === true
+        ? nextApplicant
+        : currentApplicant;
     },
   };
 }
